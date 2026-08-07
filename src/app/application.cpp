@@ -48,6 +48,9 @@ void Application::initialize() {
     world_.set_map(MapWorld::from_tmx(map_asset));
     scene_atlas_ = assets::build_atlas_from_tmx(map_asset, assets::resolve_tmx_tileset_image_path(map_asset));
     scene_atlas_image_ = assets::load_png_rgba(scene_atlas_.image_path);
+    player_sprite_base_ = scene_atlas_.tile_count();
+    const LoadedImage placeholder_atlas = assets::load_png_rgba(config_.asset_dir + "/tiles/sample_scene_atlas.png");
+    assets::append_bottom_row_sprites(scene_atlas_image_, placeholder_atlas, 4);
     scene_atlas_.columns = scene_atlas_image_.width / scene_atlas_.tile_width;
     scene_atlas_.rows = scene_atlas_image_.height / scene_atlas_.tile_height;
     scene_renderer_.initialize_scene_atlas(scene_atlas_, scene_atlas_image_);
@@ -114,7 +117,7 @@ void Application::tick_frame(float dt_seconds) {
             NetworkUnitState unit{};
             unit.id = player.id;
             unit.position = position;
-            unit.sprite_index = 49u + (player.id % 5u);
+            unit.sprite_index = player_sprite_base_ + ((player.id - 1u) % 4u);
             unit.rotation_radians = player.facing_angle;
             if (player.protected_until_us > snapshot.server_time_us &&
                 ((snapshot.server_time_us / 100000) % 2) == 0) {

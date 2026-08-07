@@ -18,5 +18,6 @@ struct LoadedImage {
 namespace assets {
 
 LoadedImage load_png_rgba(const std::string & image_path);
+void append_bottom_row_sprites(LoadedImage & destination, const LoadedImage & source, std::uint32_t sprite_count);
 
 } // namespace assets

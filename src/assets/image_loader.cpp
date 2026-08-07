@@ -56,4 +56,32 @@ LoadedImage load_png_rgba(const std::string & image_path) {
     return image;
 }
 
+void append_bottom_row_sprites(LoadedImage & destination, const LoadedImage & source, std::uint32_t sprite_count) {
+    if (destination.empty() || source.empty() || sprite_count == 0 || source.width % sprite_count != 0) {
+        fail("Invalid placeholder atlas layout");
+    }
+    const std::uint32_t source_tile = source.width / sprite_count;
+    if (source.height < source_tile || destination.width < sprite_count * 16u) {
+        fail("Placeholder sprites do not fit the scene atlas");
+    }
+    constexpr std::uint32_t destination_tile = 16;
+    const std::uint32_t old_height = destination.height;
+    destination.height += destination_tile;
+    destination.rgba_pixels.resize(static_cast<std::size_t>(destination.width) * destination.height * 4u, 0);
+    const std::uint32_t source_y = source.height - source_tile;
+    for (std::uint32_t sprite = 0; sprite < sprite_count; ++sprite) {
+        for (std::uint32_t y = 0; y < destination_tile; ++y) {
+            for (std::uint32_t x = 0; x < destination_tile; ++x) {
+                const std::uint32_t sx = sprite * source_tile + x * source_tile / destination_tile;
+                const std::uint32_t sy = source_y + y * source_tile / destination_tile;
+                const std::size_t source_offset = (static_cast<std::size_t>(sy) * source.width + sx) * 4u;
+                const std::size_t destination_offset = (static_cast<std::size_t>(old_height + y) * destination.width + sprite * destination_tile + x) * 4u;
+                for (std::size_t channel = 0; channel < 4; ++channel) {
+                    destination.rgba_pixels[destination_offset + channel] = source.rgba_pixels[source_offset + channel];
+                }
+            }
+        }
+    }
+}
+
 } // namespace assets

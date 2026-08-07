@@ -59,6 +59,7 @@ private:
     bool overlay_text_visible_ = false;
     AtlasAsset scene_atlas_;
     LoadedImage scene_atlas_image_;
+    std::uint32_t player_sprite_base_ = 0;
     std::chrono::steady_clock::time_point last_tick_{};
     Vec2f predicted_position_{};
     bool have_predicted_position_ = false;
