@@ -1,6 +1,6 @@
 #include "game/map_world.h"
 
-#include "common.h"
+#include "core/error.h"
 
 #include <charconv>
 #include <string_view>

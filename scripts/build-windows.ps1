@@ -22,6 +22,9 @@ $buildPath = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $BuildDirectory)
 $sdlPath = Join-Path $repoRoot "external\SDL"
 $sdlCMake = Join-Path $sdlPath "CMakeLists.txt"
 $sdlRevision = "a157d96de87fce84f06e60f4049dd96b8a6993e3"
+$enetPath = Join-Path $repoRoot "external\enet"
+$enetCMake = Join-Path $enetPath "CMakeLists.txt"
+$enetRevision = "v1.3.18"
 
 function Assert-LastExitCode {
     param([string]$Action)
@@ -116,16 +119,42 @@ else {
     Write-Host "  SDL:          existing source found" -ForegroundColor Green
 }
 
+if (-not (Test-Path $enetCMake)) {
+    Write-Host "Downloading pinned ENet source (no Git required)..." -ForegroundColor Cyan
+    $temporaryPath = Join-Path ([System.IO.Path]::GetTempPath()) ("gamer-time-enet-" + [guid]::NewGuid())
+    $archivePath = Join-Path $temporaryPath "enet.zip"
+    $extractPath = Join-Path $temporaryPath "extracted"
+    try {
+        New-Item -ItemType Directory -Path $extractPath -Force | Out-Null
+        Invoke-WebRequest -Uri "https://github.com/lsalzman/enet/archive/refs/tags/$enetRevision.zip" -OutFile $archivePath
+        Expand-Archive -Path $archivePath -DestinationPath $extractPath
+        $expandedRoot = Get-ChildItem -Path $extractPath -Directory | Select-Object -First 1
+        if (-not $expandedRoot) { throw "The ENet archive was empty." }
+        New-Item -ItemType Directory -Path $enetPath -Force | Out-Null
+        Copy-Item -Path (Join-Path $expandedRoot.FullName "*") -Destination $enetPath -Recurse -Force
+    }
+    finally {
+        if (Test-Path $temporaryPath) { Remove-Item -Path $temporaryPath -Recurse -Force }
+    }
+    if (-not (Test-Path $enetCMake)) { throw "ENet download completed but CMakeLists.txt is missing." }
+}
+else {
+    Write-Host "  ENet:         existing source found" -ForegroundColor Green
+}
+
 Write-Host "Configuring Visual Studio 2026 x64 build..." -ForegroundColor Cyan
 & cmake `
     -S $repoRoot `
     -B $buildPath `
     -G "Visual Studio 18 2026" `
-    -A x64
+    -A x64 `
+    -DGT_BUILD_CLIENT=ON `
+    -DGT_BUILD_SERVER=OFF `
+    -DBUILD_TESTING=OFF
 Assert-LastExitCode "CMake configuration"
 
 Write-Host "Building $Configuration client..." -ForegroundColor Cyan
-& cmake --build $buildPath --config $Configuration --parallel
+& cmake --build $buildPath --config $Configuration --target gamer_time --parallel
 Assert-LastExitCode "$Configuration build"
 
 $executable = Join-Path $buildPath "$Configuration\gamer_time.exe"

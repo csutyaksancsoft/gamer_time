@@ -51,7 +51,13 @@ void Application::initialize() {
     scene_atlas_.columns = scene_atlas_image_.width / scene_atlas_.tile_width;
     scene_atlas_.rows = scene_atlas_image_.height / scene_atlas_.tile_height;
     scene_renderer_.initialize_scene_atlas(scene_atlas_, scene_atlas_image_);
-    world_.seed_test_units();
+    try {
+        song_config_ = load_song_config(config_.asset_dir + "/audio/song.cfg");
+        song_player_.load(config_.asset_dir + "/audio", song_config_);
+    } catch (const std::exception &) {
+        // Networking and movement remain usable until the real song asset is supplied.
+    }
+    network_.connect(config_.server, config_.player_name);
 
     initialized_ = true;
 }
@@ -62,6 +68,8 @@ void Application::shutdown() {
     }
 
     scene_renderer_.shutdown();
+    network_.disconnect();
+    song_player_.stop();
     platform_.shutdown();
 
     initialized_ = false;
@@ -83,18 +91,48 @@ void Application::tick_frame(float dt_seconds) {
         show_collision_debug_ = !show_collision_debug_;
     }
 
-    camera_controller_.update(input, dt_seconds);
-    selection_system_.update(world_, input, camera_controller_.state());
-
-    if (input.right_mouse_pressed && !world_.selected_units().empty()) {
-        MoveCommand command{};
-        command.units = world_.selected_units();
-        command.destination = SelectionSystem::screen_to_world(input, camera_controller_.state());
-        world_.command_queue().push(std::move(command));
+    network_.update();
+    const net::Snapshot & snapshot = network_.snapshot();
+    if (!snapshot.players.empty()) {
+        std::vector<NetworkUnitState> units;
+        units.reserve(snapshot.players.size());
+        for (const net::PlayerState & player : snapshot.players) {
+            Vec2f position = player.position;
+            if (player.id == network_.player_id()) {
+                if (!have_predicted_position_) { predicted_position_ = position; have_predicted_position_ = true; }
+                else { predicted_position_ += (position - predicted_position_) * 0.18f; }
+                position = predicted_position_;
+            }
+            units.push_back({player.id, position, 49u + (player.id % 5u)});
+        }
+        world_.replace_network_units(units);
+        world_.set_local_unit(network_.player_id());
     }
 
-    world_.command_queue().apply(world_);
-    navigation_system_.update(world_, dt_seconds);
+    Vec2f movement{};
+    movement.x = static_cast<float>(input.move_right) - static_cast<float>(input.move_left);
+    movement.y = static_cast<float>(input.move_up) - static_cast<float>(input.move_down);
+    movement = normalize_or_zero(movement);
+    if (have_predicted_position_) {
+        const Vec2f candidate = predicted_position_ + movement * (net::kMoveSpeed * dt_seconds);
+        if (!world_.collision().blocks_segment(predicted_position_, candidate)) predicted_position_ = candidate;
+        camera_controller_.follow(predicted_position_);
+        if (TransformComponent * transform = world_.try_transform(network_.player_id())) transform->position = predicted_position_;
+    }
+    camera_controller_.update(input, dt_seconds);
+    input_send_accumulator_ += dt_seconds;
+    if (input_send_accumulator_ >= 1.0f / 60.0f) {
+        input_send_accumulator_ = 0.0f;
+        network_.send_input(static_cast<std::int8_t>(movement.x * 127.0f), static_cast<std::int8_t>(movement.y * 127.0f));
+    }
+    if (input.space_pressed) network_.send_rhythm_hit(config_.calibration_ms);
+    net::SongSchedule schedule{};
+    if(network_.take_song_schedule(schedule)) {
+        const auto local_start = static_cast<std::uint64_t>(static_cast<std::int64_t>(schedule.server_start_us) - network_.server_offset_us());
+        song_player_.schedule(local_start);
+    }
+    song_player_.update(net::monotonic_time_us());
+    if(network_.take_rhythm_result(last_rhythm_result_)) have_rhythm_result_=true;
     fog_of_war_system_.update(world_);
     RenderWorld render_world = render_extractor_.build(
         world_,
@@ -126,8 +164,8 @@ void Application::update_window_title(const RenderBatch & batch) const {
     title += std::to_string(world_.map().total_tile_count());
     title += " | visible: ";
     title += std::to_string(batch.unit_instance_count);
-    title += " | selected: ";
-    title += std::to_string(world_.selected_units().size());
+    title += " | net: ";
+    title += network_.status();
     platform_.set_window_title(title.c_str());
 }
 
@@ -135,8 +173,12 @@ std::string Application::build_overlay_text() const {
     std::ostringstream overlay;
     const CameraState & camera = camera_controller_.state();
 
-    overlay << "GAMER_TIME RTS FRAMEWORK\n";
-    overlay << "ESC quit | F3 collision debug | click select | right click move | WASD/Arrows pan | wheel zoom\n\n";
+    overlay << "GAMER_TIME NETWORK ARENA\n";
+    overlay << "ESC quit | WASD move | SPACE rhythm | wheel zoom | F3 collision debug\n\n";
+    overlay << "Network: " << network_.status() << " | Player ID: " << network_.player_id() << '\n';
+    overlay << "Server clock offset: " << network_.server_offset_us() / 1000 << " ms\n";
+    overlay << "Audio: " << (song_player_.error().empty() ? "ready" : song_player_.error()) << '\n';
+    if(have_rhythm_result_) overlay << "Last hit: " << net::grade_name(last_rhythm_result_.grade) << " (" << last_rhythm_result_.offset_ms << " ms) | P/G/M " << last_rhythm_result_.perfect << "/" << last_rhythm_result_.good << "/" << last_rhythm_result_.miss << '\n';
     overlay << "Map size: " << world_.map().width() << "x" << world_.map().height() << " tiles\n";
     overlay << "Units: " << world_.unit_count() << '\n';
     overlay << "Tile layers: " << world_.map().tile_layers().size() << '\n';
@@ -144,7 +186,6 @@ std::string Application::build_overlay_text() const {
     overlay << "Terrain tiles: " << world_.map().total_tile_count() << '\n';
     overlay << "Collision polygons: " << world_.collision().polygon_count() << '\n';
     overlay << "Collision debug: " << (show_collision_debug_ ? "on" : "off") << '\n';
-    overlay << "Selected: " << world_.selected_units().size() << '\n';
     overlay << "Camera: (" << static_cast<int>(camera.world_center.x) << ", " << static_cast<int>(camera.world_center.y) << ") zoom " << camera.zoom << "\n";
     overlay << "Fog cells visible: " << std::count(world_.fog_mask().begin(), world_.fog_mask().end(), static_cast<std::uint8_t>(255)) << "\n";
     overlay << "Uploaded instances: " << scene_renderer_.resources().staged_instances().size() << "\n";

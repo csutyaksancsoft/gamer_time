@@ -11,7 +11,7 @@ SdlPlatform::~SdlPlatform() {
 void SdlPlatform::initialize(const RuntimeConfig & config) {
     shutdown();
 
-    if (!SDL_Init(SDL_INIT_VIDEO)) {
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
         throw std::runtime_error("SDL_Init failed");
     }
 

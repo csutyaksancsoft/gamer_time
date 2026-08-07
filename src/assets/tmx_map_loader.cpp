@@ -1,6 +1,6 @@
 #include "assets/tmx_map_loader.h"
 
-#include "common.h"
+#include "core/error.h"
 
 #include <algorithm>
 #include <cctype>

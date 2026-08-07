@@ -1,5 +1,7 @@
 #include "game/world.h"
 
+#include <algorithm>
+
 namespace {
 
 constexpr UnitId kInvalidUnitId = static_cast<UnitId>(-1);
@@ -26,6 +28,32 @@ void World::seed_test_units() {
     create_unit({{-60.0f, 0.0f}}, {50, {16.0f, 16.0f}}, {96.0f}, {});
     create_unit({{60.0f, 70.0f}}, {98, {16.0f, 16.0f}}, {112.0f}, {});
     create_unit({{150.0f, -20.0f}}, {116, {16.0f, 16.0f}}, {112.0f}, {});
+}
+
+void World::replace_network_units(const std::vector<NetworkUnitState> & network_units) {
+    unit_ids_.clear();
+    transforms_.clear();
+    renders_.clear();
+    visions_.clear();
+    units_.clear();
+    selected_units_.clear();
+
+    UnitId maximum_id = 0;
+    for (const NetworkUnitState & state : network_units) {
+        maximum_id = std::max(maximum_id, state.id);
+    }
+    const std::size_t count = network_units.empty() ? 0 : static_cast<std::size_t>(maximum_id) + 1;
+    unit_ids_.reserve(network_units.size());
+    transforms_.resize(count);
+    renders_.resize(count);
+    visions_.resize(count);
+    units_.resize(count);
+    for (const NetworkUnitState & state : network_units) {
+        unit_ids_.push_back(state.id);
+        transforms_[state.id] = {state.position};
+        renders_[state.id] = {state.sprite_index, {16.0f, 16.0f}};
+        visions_[state.id] = {112.0f};
+    }
 }
 
 UnitId World::create_unit(
@@ -101,7 +129,7 @@ const UnitComponent * World::try_unit(UnitId unit_id) const {
 }
 
 std::size_t World::to_index(UnitId unit_id) const {
-    if (unit_id >= unit_ids_.size()) {
+    if (unit_id >= transforms_.size()) {
         return static_cast<std::size_t>(kInvalidUnitId);
     }
     return static_cast<std::size_t>(unit_id);

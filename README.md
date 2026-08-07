@@ -1,7 +1,8 @@
 # Gamer Time
 
-An SDL3 and Vulkan game client. The Windows build is distributed as a portable
-ZIP and does not include or require llama.cpp or an AI model.
+A networked SDL3/Vulkan arena client plus a headless authoritative Linux
+server. Each player controls one avatar with WASD; the server replicates all
+positions, while the client owns its camera and cosmetic fog of war.
 
 ## Windows prerequisites
 
@@ -17,8 +18,8 @@ The supported Windows toolchain is Visual Studio 2026 on 64-bit Windows 10 or
    the runtime.
 
 Git is not required when the project folder is obtained another way. The build
-script downloads the exact SDL revision used by the project if `external/SDL`
-is missing.
+script downloads the exact SDL and ENet revisions used by the project when
+either dependency is missing.
 
 Players need only a Vulkan-capable GPU with a current graphics driver. They do
 not need Visual Studio, the Vulkan SDK, or the Visual C++ Redistributable.
@@ -53,8 +54,32 @@ build-windows\Release\gamer_time.exe
 build-windows\gamer-time-windows-x64.zip
 ```
 
-Extract the ZIP into a new directory and launch `gamer_time.exe` to test the
-same package players will receive.
+Extract the ZIP and launch the client with a LAN server address and name:
+
+```powershell
+.\gamer_time.exe --server 192.168.1.10:27020 --name YourName
+```
+
+Add the real `assets\audio\song.wav` before packaging. Its BPM, first beat,
+subdivision, and duration are configured in `assets\audio\song.cfg`.
+
+## Linux LAN server
+
+Install a C++ compiler, CMake, and curl. SDL, Vulkan, and Git are not required:
+
+```bash
+bash scripts/build-server.sh
+bash scripts/run-lan-server.sh
+```
+
+The server terminal accepts `status`, `start`, `stop`, `kick ID`, and `quit`.
+`start` schedules the shared song three seconds in the future.
+
+Run protocol/load-test clients from another terminal:
+
+```bash
+./build-server/gamer_time_bot --server 127.0.0.1:27020 --count 64
+```
 
 ### Script options
 

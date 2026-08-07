@@ -5,11 +5,12 @@
 #include "assets/image_loader.h"
 #include "assets/tmx_map_loader.h"
 #include "game/fog_of_war_system.h"
-#include "game/navigation_system.h"
-#include "game/selection_system.h"
+#include "net/client.h"
 #include "game/world.h"
 #include "platform/camera_controller.h"
 #include "platform/sdl_platform.h"
+#include "platform/song_player.h"
+#include "rhythm/song_config.h"
 #include "render/batch_builder.h"
 #include "render/depth_sorter.h"
 #include "render/frustum_culler.h"
@@ -39,8 +40,9 @@ private:
     SdlPlatform platform_;
     CameraController camera_controller_;
     World world_;
-    SelectionSystem selection_system_;
-    NavigationSystem navigation_system_;
+    net::Client network_;
+    SongPlayer song_player_;
+    SongConfig song_config_{};
     FogOfWarSystem fog_of_war_system_;
     RenderExtractor render_extractor_;
     FrustumCuller frustum_culler_;
@@ -54,4 +56,9 @@ private:
     AtlasAsset scene_atlas_;
     LoadedImage scene_atlas_image_;
     std::chrono::steady_clock::time_point last_tick_{};
+    Vec2f predicted_position_{};
+    bool have_predicted_position_ = false;
+    float input_send_accumulator_ = 0.0f;
+    net::RhythmResult last_rhythm_result_{};
+    bool have_rhythm_result_ = false;
 };

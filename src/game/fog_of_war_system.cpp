@@ -13,7 +13,11 @@ void FogOfWarSystem::update(World & world) const {
     const float half_width = static_cast<float>(world.fog_width()) * cell_width * 0.5f;
     const float half_height = static_cast<float>(world.fog_height()) * cell_height * 0.5f;
 
+    const UnitId local_unit = world.local_unit();
     for (UnitId unit_id : world.unit_ids()) {
+        if (local_unit != static_cast<UnitId>(-1) && unit_id != local_unit) {
+            continue;
+        }
         const TransformComponent * transform = world.try_transform(unit_id);
         const VisionComponent * vision = world.try_vision(unit_id);
         if (!transform || !vision) {

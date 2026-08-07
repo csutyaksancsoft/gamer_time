@@ -15,7 +15,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "../../external/SDL/src/video/stb_image.h"
 
-#include "common.h"
+#include "core/error.h"
 
 #include <limits>
 

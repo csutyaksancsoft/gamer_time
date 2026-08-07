@@ -11,6 +11,7 @@ struct CameraState {
 class CameraController {
 public:
     void update(const InputState & input, float dt_seconds);
+    void follow(Vec2f position) { state_.world_center = position; }
 
     const CameraState & state() const {
         return state_;

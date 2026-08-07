@@ -14,6 +14,7 @@ public:
     World();
 
     void seed_test_units();
+    void replace_network_units(const std::vector<struct NetworkUnitState> & units);
     void set_map(MapWorld map);
 
     UnitId create_unit(
@@ -24,7 +25,7 @@ public:
     );
 
     std::size_t unit_count() const {
-        return transforms_.size();
+        return unit_ids_.size();
     }
 
     const std::vector<UnitId> & unit_ids() const {
@@ -79,6 +80,9 @@ public:
         return collision_;
     }
 
+    void set_local_unit(UnitId unit_id) { local_unit_id_ = unit_id; }
+    UnitId local_unit() const { return local_unit_id_; }
+
 private:
     std::size_t to_index(UnitId unit_id) const;
 
@@ -94,4 +98,11 @@ private:
     std::uint32_t fog_height_ = 64;
     MapWorld map_;
     CollisionWorld collision_;
+    UnitId local_unit_id_ = static_cast<UnitId>(-1);
+};
+
+struct NetworkUnitState {
+    UnitId id = 0;
+    Vec2f position{};
+    std::uint32_t sprite_index = 49;
 };
