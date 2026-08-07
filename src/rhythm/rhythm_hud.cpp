@@ -34,9 +34,9 @@ void RhythmHud::apply_result(const net::RhythmResult & result, std::uint64_t now
 
 void RhythmHud::append_instances(RenderBatch & batch, int width, int height, std::uint64_t now_us) const {
     if(width<=0||height<=0)return;
-    const float center=width*0.5f;const float lane_y=static_cast<float>(height)-70.0f;
+    const float center=width*0.5f;const float lane_y=static_cast<float>(height)-38.0f;
     if(batch.debug_instance_count==0)batch.debug_instance_offset=static_cast<std::uint32_t>(batch.instances.size());
-    add_rect(batch,center,lane_y,std::max(100.0f,static_cast<float>(width)-64.0f),76.0f,0.055f,0.065f,0.09f,0.92f);
+    add_rect(batch,center,lane_y,static_cast<float>(width),76.0f,0.055f,0.065f,0.09f,0.92f);
     add_rect(batch,center,lane_y,8.0f,92.0f,0.9f,0.9f,0.95f);
     add_rect(batch,center,lane_y,38.0f,50.0f,0.16f,0.22f,0.28f);
     if(feedback_time_us_!=0&&now_us-feedback_time_us_<=750000){

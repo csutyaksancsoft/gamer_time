@@ -87,7 +87,7 @@ int main(int argc,char ** argv) try {
     std::string bind="0.0.0.0:27020", map_path="assets/maps/grass_tileset_map.tmx", song_path="assets/audio/song.cfg";
     for(int i=1;i<argc;++i){const std::string arg=argv[i];if(arg=="--bind"&&i+1<argc)bind=argv[++i];else if(arg=="--map"&&i+1<argc)map_path=argv[++i];else if(arg=="--song"&&i+1<argc)song_path=argv[++i];else fail("Usage: gamer_time_server [--bind host:port] [--map path] [--song path]");}
     const MapWorld map=MapWorld::from_tmx(assets::load_tmx_map(map_path)); const CollisionWorld collision=CollisionWorld::from_map(map); const SongConfig song_config=load_song_config(song_path);
-    const auto slash=song_path.find_last_of("/\\");const std::string song_dir=slash==std::string::npos?".":song_path.substr(0,slash);const auto chart=load_note_chart(song_dir+"/"+song_config.chart,song_config.duration_ms);
+    const auto chart=generate_beat_grid(song_config);
     if(enet_initialize()!=0) fail("ENet initialization failed");
     const auto [host_name,port]=split_endpoint(bind); ENetAddress address{}; address.port=port;
     if(host_name=="0.0.0.0") address.host=ENET_HOST_ANY; else if(enet_address_set_host(&address,host_name.c_str())!=0) fail("Invalid bind address");

@@ -6,7 +6,7 @@
 #include <cctype>
 #include <fstream>
 #include <string_view>
-#include <limits>
+#include <cmath>
 
 namespace {
 std::string trim(std::string value) {
@@ -28,32 +28,21 @@ SongConfig load_song_config(const std::string & path) {
         const auto equals = line.find('=');
         if (equals == std::string::npos) fail("Malformed song metadata line: " + line);
         const std::string key=trim(line.substr(0,equals)); const std::string value=trim(line.substr(equals+1));
-        if(key=="id") config.id=value; else if(key=="file") config.file=value; else if(key=="chart") config.chart=value; else if(key=="bpm") config.bpm=std::stof(value); else if(key=="first_beat_ms") config.first_beat_ms=std::stoi(value); else if(key=="subdivision") config.subdivision=static_cast<std::uint16_t>(std::stoul(value)); else if(key=="duration_ms") config.duration_ms=static_cast<std::uint32_t>(std::stoul(value));
+        if(key=="id") config.id=value; else if(key=="file") config.file=value; else if(key=="bpm") config.bpm=std::stof(value); else if(key=="first_beat_ms") config.first_beat_ms=std::stoi(value); else if(key=="subdivision") config.subdivision=static_cast<std::uint16_t>(std::stoul(value)); else if(key=="duration_ms") config.duration_ms=static_cast<std::uint32_t>(std::stoul(value));
     }
     if(config.bpm<=0.0f || config.subdivision==0 || config.duration_ms==0) fail("song.cfg requires positive bpm, subdivision, and duration_ms");
     return config;
 }
 
-std::vector<std::uint32_t> load_note_chart(const std::string & path, std::uint32_t duration_ms) {
+std::vector<std::uint32_t> generate_beat_grid(const SongConfig & config) {
     constexpr std::size_t kMaximumNotes = 4096;
-    std::ifstream file(path);
-    if (!file) fail("Missing note chart: " + path);
     std::vector<std::uint32_t> notes;
-    std::string line;
-    std::uint32_t previous = 0;
-    while (std::getline(file, line)) {
-        line = trim(line);
-        if (line.empty() || line[0] == '#') continue;
-        std::size_t consumed = 0;
-        const unsigned long value = std::stoul(line, &consumed);
-        if (consumed != line.size() || value > duration_ms || value > std::numeric_limits<std::uint32_t>::max()) {
-            fail("Invalid note timestamp in " + path + ": " + line);
-        }
-        const auto timestamp = static_cast<std::uint32_t>(value);
-        if (!notes.empty() && timestamp <= previous) fail("Note chart timestamps must be unique and increasing: " + path);
-        notes.push_back(timestamp);
-        previous = timestamp;
-        if (notes.size() > kMaximumNotes) fail("Note chart exceeds 4096 notes: " + path);
+    const double interval_ms=60000.0/(static_cast<double>(config.bpm)*config.subdivision);
+    for(std::int64_t index=0;;++index){
+        const auto timestamp=static_cast<std::int64_t>(std::llround(config.first_beat_ms+index*interval_ms));
+        if(timestamp>=static_cast<std::int64_t>(config.duration_ms))break;
+        if(timestamp>=0&&(notes.empty()||timestamp>notes.back()))notes.push_back(static_cast<std::uint32_t>(timestamp));
+        if(notes.size()>kMaximumNotes)fail("Generated beat grid exceeds 4096 notes");
     }
     return notes;
 }

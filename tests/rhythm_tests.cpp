@@ -15,8 +15,10 @@ int main() {
     require(!rhythm::note_expired(1080,1000));
     require(rhythm::note_expired(1081,1000));
 
-    const auto chart=load_note_chart(GT_SOURCE_DIR "/assets/audio/MEMECAR-001.chart",145000);
+    SongConfig config{};config.bpm=120.0f;config.first_beat_ms=0;config.subdivision=1;config.duration_ms=145000;const auto chart=generate_beat_grid(config);
     require(chart.size()==290);require(chart.front()==0);require(chart.back()==144500);
+    config.first_beat_ms=125;config.subdivision=2;config.duration_ms=1000;const auto offset_chart=generate_beat_grid(config);
+    require(offset_chart.size()==4);require(offset_chart[0]==125);require(offset_chart[1]==375);require(offset_chart[3]==875);
 
     RhythmHud hud;net::SongSchedule schedule{};schedule.duration_ms=2000;schedule.note_times_ms={1000};
     constexpr std::uint64_t start=1000000;hud.schedule(schedule,start);

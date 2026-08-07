@@ -75,6 +75,24 @@ bash scripts/run-lan-server.sh
 The server terminal accepts `status`, `start`, `stop`, `kick ID`, and `quit`.
 `start` schedules the shared song three seconds in the future.
 
+## Automatic BPM and beat-offset detection
+
+Install the offline analyzer once:
+
+```bash
+python -m pip install essentia
+```
+
+Then analyze a song and update `assets/audio/song.cfg` automatically:
+
+```bash
+python detect_bpm.py --wav MEMECAR-001.wav
+```
+
+Use `--dry-run` to inspect the detected BPM, first-beat offset, duration, and
+confidence without changing the configuration. The detector normalizes
+half/double-tempo results into the 90–180 BPM gameplay range by default.
+
 Run protocol/load-test clients from another terminal:
 
 ```bash
