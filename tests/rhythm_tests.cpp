@@ -1,6 +1,7 @@
 #include "rhythm/rhythm_hud.h"
 #include "rhythm/rhythm_judgment.h"
 #include "rhythm/song_config.h"
+#include "platform/camera_controller.h"
 
 #include <cmath>
 #include <stdexcept>
@@ -14,6 +15,7 @@ int main() {
     require(rhythm::grade_offset(81)==net::RhythmGrade::miss);
     require(!rhythm::note_expired(1080,1000));
     require(rhythm::note_expired(1081,1000));
+    CameraState camera{{100.0f,-50.0f},2.0f};const Vec2f center=screen_to_world(400,300,800,600,camera);require(std::abs(center.x-100.0f)<0.001f&&std::abs(center.y+50.0f)<0.001f);const Vec2f corner=screen_to_world(600,100,800,600,camera);require(std::abs(corner.x-200.0f)<0.001f&&std::abs(corner.y-50.0f)<0.001f);
 
     SongConfig config{};config.bpm=120.0f;config.first_beat_ms=0;config.subdivision=1;config.duration_ms=145000;const auto chart=generate_beat_grid(config);
     require(chart.size()==290);require(chart.front()==0);require(chart.back()==144500);

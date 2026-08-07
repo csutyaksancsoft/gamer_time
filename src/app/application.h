@@ -65,4 +65,6 @@ private:
     float input_send_accumulator_ = 0.0f;
     net::RhythmResult last_rhythm_result_{};
     bool have_rhythm_result_ = false;
+    bool local_alive_ = true;
+    std::uint64_t local_respawn_at_us_ = 0;
 };

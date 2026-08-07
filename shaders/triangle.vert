@@ -40,9 +40,12 @@ void main() {
     );
     vec2 worldPos = inWorldPos + localOffset;
     vec2 screenPos = (inFlags & 16u) != 0u ? worldPos : (worldPos - scene.cameraCenter) * scene.zoom + scene.viewportSize * 0.5;
+    bool screenSpace = (inFlags & 16u) != 0u;
     vec2 ndc = vec2(
         (screenPos.x / scene.viewportSize.x) * 2.0 - 1.0,
-        1.0 - (screenPos.y / scene.viewportSize.y) * 2.0
+        screenSpace
+            ? (screenPos.y / scene.viewportSize.y) * 2.0 - 1.0
+            : 1.0 - (screenPos.y / scene.viewportSize.y) * 2.0
     );
 
     gl_Position = vec4(ndc, 0.0, 1.0);

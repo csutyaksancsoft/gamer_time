@@ -7,7 +7,6 @@ struct InputState {
     bool toggle_collision_debug_pressed = false;
     bool toggle_terrain_debug_pressed = false;
     bool toggle_fog_pressed = false;
-    bool space_pressed = false;
     bool left_mouse_pressed = false;
     bool right_mouse_pressed = false;
     bool move_left = false;

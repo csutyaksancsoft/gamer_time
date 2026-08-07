@@ -38,7 +38,17 @@ struct Player {
     net::RhythmResult score{};
     std::vector<std::uint8_t> judged_notes;
     std::size_t next_expiring_note = 0;
+    bool alive = true;
+    float facing_angle = 0.0f;
+    std::uint64_t respawn_at_us = 0;
+    std::uint64_t protected_until_us = 0;
 };
+
+struct Projectile {std::uint32_t id=0;net::PlayerId owner_id=0;Vec2f position{};Vec2f velocity{};std::uint64_t spawn_us=0;float angle=0.0f;};
+constexpr float kProjectileSpeed=480.0f,kProjectileRadius=6.0f,kPlayerRadius=8.0f;
+constexpr std::uint64_t kProjectileLifetimeUs=2000000,kRespawnDelayUs=5000000,kProtectionUs=1000000;
+
+float segment_distance_squared(Vec2f a,Vec2f b,Vec2f point){const Vec2f d=b-a;const float denom=length_squared(d);const float t=denom>0.0f?std::clamp(dot(point-a,d)/denom,0.0f,1.0f):0.0f;return length_squared(point-(a+d*t));}
 
 bool terminal_line_ready() {
 #ifdef _WIN32
@@ -70,6 +80,8 @@ Vec2f spawn_for(std::uint32_t index, const MapWorld & map, const CollisionWorld 
     return {};
 }
 
+template<class Players> Vec2f safe_spawn_for(std::uint32_t index,const MapWorld & map,const CollisionWorld & collision,const Players & players){for(std::uint32_t offset=0;offset<map.width()*map.height();++offset){const Vec2f p=spawn_for(index+offset,map,collision);bool clear=true;for(const auto & entry:players){const auto & other=entry.second;if(other.active&&other.alive&&length_squared(p-other.position)<64.0f*64.0f){clear=false;break;}}if(clear)return p;}return spawn_for(index,map,collision);}
+
 net::RhythmResult grade_hit(Player & player, std::uint64_t hit_us, std::int16_t calibration_ms, const net::SongSchedule & song) {
     constexpr std::int64_t kGoodWindowMs=80;
     const std::int64_t relative_ms=(static_cast<std::int64_t>(hit_us)-static_cast<std::int64_t>(song.server_start_us))/1000-calibration_ms;
@@ -92,7 +104,7 @@ int main(int argc,char ** argv) try {
     const auto [host_name,port]=split_endpoint(bind); ENetAddress address{}; address.port=port;
     if(host_name=="0.0.0.0") address.host=ENET_HOST_ANY; else if(enet_address_set_host(&address,host_name.c_str())!=0) fail("Invalid bind address");
     ENetHost * host=enet_host_create(&address,net::kMaxPlayers,2,0,0); if(!host) fail("Could not create server socket");
-    std::unordered_map<ENetPeer*,Player> players; net::PlayerId next_id=1; std::uint32_t tick=0; bool running=true; net::RoomState room=net::RoomState::lobby; net::SongSchedule song{};
+    std::unordered_map<ENetPeer*,Player> players;std::vector<Projectile> projectiles;net::PlayerId next_id=1;std::uint32_t next_projectile_id=1; std::uint32_t tick=0; bool running=true; net::RoomState room=net::RoomState::lobby; net::SongSchedule song{};
     std::cout<<"Server listening on "<<bind<<". Commands: status, start, stop, kick <id>, quit\n";
     auto next_tick=std::chrono::steady_clock::now();
     while(running){
@@ -101,21 +113,23 @@ int main(int argc,char ** argv) try {
             else if(event.type==ENET_EVENT_TYPE_RECEIVE){
                 try{net::Reader reader({event.packet->data,event.packet->dataLength});const auto type=reader.type();auto found=players.find(event.peer);
                     if(type==net::MessageType::hello&&found==players.end()&&players.size()<net::kMaxPlayers){if(reader.u32()!=net::kProtocolVersion)fail("Protocol mismatch");Player player{};player.id=next_id++;player.name=reader.string(24);if(player.name.empty())player.name="Player";player.position=spawn_for(player.id,map,collision);player.color=0xff000000u|((player.id*2654435761u)&0x00ffffffu);player.active=room!=net::RoomState::playing&&room!=net::RoomState::countdown;players.emplace(event.peer,player);send_packet(event.peer,net::make_welcome(player.id,player.position),true);std::cout<<player.name<<" joined as "<<player.id<<(player.active?"":" (waiting for next round)")<<"\n";}
-                    else if(found!=players.end()&&type==net::MessageType::input){found->second.input_sequence=reader.u32();found->second.input_x=static_cast<std::int8_t>(reader.u8());found->second.input_y=static_cast<std::int8_t>(reader.u8());reader.u64();}
+                    else if(found!=players.end()&&type==net::MessageType::input){found->second.input_sequence=reader.u32();const auto x=static_cast<std::int8_t>(reader.u8()),y=static_cast<std::int8_t>(reader.u8());found->second.input_x=found->second.alive?x:0;found->second.input_y=found->second.alive?y:0;reader.u64();}
                     else if(found!=players.end()&&type==net::MessageType::ready)found->second.ready=true;
                     else if(type==net::MessageType::clock_ping){const auto client=reader.u64();const auto receive=net::monotonic_time_us();send_packet(event.peer,net::make_clock_pong(client,receive,net::monotonic_time_us()),false);}
-                    else if(found!=players.end()&&type==net::MessageType::rhythm_hit){reader.u32();const auto hit=reader.u64();const auto calibration=std::clamp<int>(reader.i16(),-250,250);net::RhythmResult result{};if(room==net::RoomState::playing)result=grade_hit(found->second,hit,static_cast<std::int16_t>(calibration),song);else{result=found->second.score;result.grade=net::RhythmGrade::miss;++result.miss;found->second.score=result;}send_packet(event.peer,net::make_rhythm_result(result),true);}
+                    else if(found!=players.end()&&type==net::MessageType::rhythm_hit){reader.u32();const auto hit=reader.u64();const auto calibration=std::clamp<int>(reader.i16(),-250,250);Vec2f aim={reader.f32(),reader.f32()};net::RhythmResult result{};if(room==net::RoomState::playing&&found->second.alive)result=grade_hit(found->second,hit,static_cast<std::int16_t>(calibration),song);else{result=found->second.score;result.grade=net::RhythmGrade::miss;++result.miss;result.combo=0;found->second.score=result;}const float aim_length=length(aim);const bool valid_aim=std::isfinite(aim.x)&&std::isfinite(aim.y)&&aim_length>0.999f&&aim_length<1.001f;result.shot_fired=result.grade!=net::RhythmGrade::miss&&valid_aim&&found->second.alive&&room==net::RoomState::playing;if(result.shot_fired){aim=aim/aim_length;found->second.facing_angle=std::atan2(aim.y,aim.x);projectiles.push_back({next_projectile_id++,found->second.id,found->second.position+aim*14.0f,aim*kProjectileSpeed,net::monotonic_time_us(),found->second.facing_angle});}found->second.score=result;send_packet(event.peer,net::make_rhythm_result(result),true);}
                 }catch(const std::exception & e){std::cerr<<"Rejected packet: "<<e.what()<<"\n";}
                 enet_packet_destroy(event.packet);
             }
         }
         constexpr float dt=1.0f/60.0f;
-        for(auto & [peer,player]:players){if(!player.active)continue;Vec2f direction=normalize_or_zero({player.input_x/127.0f,player.input_y/127.0f});player.velocity=direction*net::kMoveSpeed;Vec2f candidate=player.position+player.velocity*dt;if(collision.blocks_segment(player.position,candidate)){candidate=player.position;player.velocity={};}
-            bool blocked=false;for(const auto & [other_peer,other]:players){if(other_peer!=peer&&other.active&&length_squared(candidate-other.position)<16.0f*16.0f){blocked=true;break;}}if(!blocked)player.position=candidate;else player.velocity={};}
+        for(auto & [peer,player]:players){if(!player.active||!player.alive)continue;Vec2f direction=normalize_or_zero({player.input_x/127.0f,player.input_y/127.0f});player.velocity=direction*net::kMoveSpeed;Vec2f candidate=player.position+player.velocity*dt;if(collision.blocks_segment(player.position,candidate)){candidate=player.position;player.velocity={};}
+            bool blocked=false;for(const auto & [other_peer,other]:players){if(other_peer!=peer&&other.active&&other.alive&&length_squared(candidate-other.position)<16.0f*16.0f){blocked=true;break;}}if(!blocked)player.position=candidate;else player.velocity={};}
         const auto now=net::monotonic_time_us();if(room==net::RoomState::countdown&&now>=song.server_start_us)room=net::RoomState::playing;
-        if(room==net::RoomState::playing){for(auto & [peer,p]:players){while(p.next_expiring_note<song.note_times_ms.size()&&now>song.server_start_us+(static_cast<std::uint64_t>(song.note_times_ms[p.next_expiring_note])+80)*1000ULL){const auto index=p.next_expiring_note++;if(index<p.judged_notes.size()&&!p.judged_notes[index]){p.judged_notes[index]=1;p.score.grade=net::RhythmGrade::miss;p.score.offset_ms=80;p.score.note_index=static_cast<std::uint32_t>(index);p.score.combo=0;p.score.overstrum=false;++p.score.miss;send_packet(peer,net::make_rhythm_result(p.score),true);}}}}
+        for(auto & [peer,p]:players){(void)peer;if(p.active&&!p.alive&&now>=p.respawn_at_us){p.position=safe_spawn_for(p.id+tick,map,collision,players);p.velocity={};p.input_x=p.input_y=0;p.alive=true;p.respawn_at_us=0;p.protected_until_us=now+kProtectionUs;}}
+        for(auto it=projectiles.begin();it!=projectiles.end();){const Vec2f next=it->position+it->velocity*dt;bool destroy=now-it->spawn_us>=kProjectileLifetimeUs||collision.blocks_segment(it->position,next);if(!destroy){for(auto & [peer,p]:players){(void)peer;if(!p.active||!p.alive||p.id==it->owner_id||now<p.protected_until_us)continue;if(segment_distance_squared(it->position,next,p.position)<(kProjectileRadius+kPlayerRadius)*(kProjectileRadius+kPlayerRadius)){p.alive=false;p.velocity={};p.input_x=p.input_y=0;p.respawn_at_us=now+kRespawnDelayUs;p.protected_until_us=0;destroy=true;break;}}}if(destroy)it=projectiles.erase(it);else{it->position=next;++it;}}
+        if(room==net::RoomState::playing){for(auto & [peer,p]:players){while(p.next_expiring_note<song.note_times_ms.size()&&now>song.server_start_us+(static_cast<std::uint64_t>(song.note_times_ms[p.next_expiring_note])+80)*1000ULL){const auto index=p.next_expiring_note++;if(index<p.judged_notes.size()&&!p.judged_notes[index]){p.judged_notes[index]=1;p.score.grade=net::RhythmGrade::miss;p.score.offset_ms=80;p.score.note_index=static_cast<std::uint32_t>(index);p.score.combo=0;p.score.overstrum=false;p.score.shot_fired=false;++p.score.miss;send_packet(peer,net::make_rhythm_result(p.score),true);}}}}
         if(room==net::RoomState::playing&&now>=song.server_start_us+song.duration_ms*1000ULL)room=net::RoomState::free_move;
-        if(tick%3==0){net::Snapshot snapshot{};snapshot.server_time_us=now;snapshot.server_tick=tick;for(const auto & [peer,p]:players){(void)peer;if(p.active)snapshot.players.push_back({p.id,p.position,p.velocity,p.input_sequence,p.color,p.name});}const auto bytes=net::make_snapshot(snapshot);for(auto & [peer,p]:players){(void)p;send_packet(peer,bytes,false);}}
+        if(tick%3==0){net::Snapshot snapshot{};snapshot.server_time_us=now;snapshot.server_tick=tick;for(const auto & [peer,p]:players){(void)peer;if(p.active){net::PlayerState state{};state.id=p.id;state.position=p.position;state.velocity=p.velocity;state.acknowledged_input=p.input_sequence;state.color=p.color;state.name=p.name;state.alive=p.alive;state.facing_angle=p.facing_angle;state.respawn_at_us=p.respawn_at_us;state.protected_until_us=p.protected_until_us;snapshot.players.push_back(state);}}for(const auto & p:projectiles)snapshot.projectiles.push_back({p.id,p.owner_id,p.position,p.velocity,p.angle});const auto bytes=net::make_snapshot(snapshot);for(auto & [peer,p]:players){(void)p;send_packet(peer,bytes,false);}}
         if(terminal_line_ready()){std::string line;std::getline(std::cin,line);if(line=="quit")running=false;else if(line=="status")std::cout<<players.size()<<" players, tick "<<tick<<", room "<<static_cast<int>(room)<<"\n";else if(line=="stop")room=net::RoomState::free_move;else if(line=="start"){const bool all_ready=std::all_of(players.begin(),players.end(),[](const auto & entry){return entry.second.ready;});if(players.empty()||!all_ready)std::cout<<"Start refused: all connected clients must be ready\n";else{song={now+3000000ULL,song_config.duration_ms,song_config.bpm,song_config.first_beat_ms,song_config.subdivision,song_config.id,chart};room=net::RoomState::countdown;for(auto & [peer,p]:players){p.score={};p.judged_notes.assign(chart.size(),0);p.next_expiring_note=0;p.active=true;send_packet(peer,net::make_song_schedule(song),true);}std::cout<<"Song scheduled in 3 seconds\n";}}else if(line.rfind("kick ",0)==0){const auto id=static_cast<net::PlayerId>(std::stoul(line.substr(5)));for(auto & [peer,p]:players)if(p.id==id){enet_peer_disconnect(peer,0);break;}}}
         enet_host_flush(host);++tick;next_tick+=std::chrono::microseconds(16667);std::this_thread::sleep_until(next_tick);
     }

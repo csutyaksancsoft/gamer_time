@@ -6,6 +6,7 @@
 #include <bit>
 #include <chrono>
 #include <cstring>
+#include <cmath>
 
 namespace net {
 
@@ -47,21 +48,25 @@ std::vector<std::uint8_t> make_welcome(PlayerId id, Vec2f spawn) { Writer w(Mess
 std::vector<std::uint8_t> make_input(std::uint32_t seq, std::int8_t x, std::int8_t y, std::uint64_t time) { Writer w(MessageType::input); w.u32(seq); w.u8(static_cast<std::uint8_t>(x)); w.u8(static_cast<std::uint8_t>(y)); w.u64(time); return w.bytes(); }
 std::vector<std::uint8_t> make_snapshot(const Snapshot & s) {
     Writer w(MessageType::snapshot); w.u64(s.server_time_us); w.u32(s.server_tick); w.u8(static_cast<std::uint8_t>(std::min(s.players.size(), kMaxPlayers)));
-    for (std::size_t i = 0; i < std::min(s.players.size(), kMaxPlayers); ++i) { const auto & p=s.players[i]; w.u32(p.id); w.f32(p.position.x); w.f32(p.position.y); w.f32(p.velocity.x); w.f32(p.velocity.y); w.u32(p.acknowledged_input); w.u32(p.color); w.string(p.name,24); }
+    for (std::size_t i = 0; i < std::min(s.players.size(), kMaxPlayers); ++i) { const auto & p=s.players[i]; w.u32(p.id); w.f32(p.position.x); w.f32(p.position.y); w.f32(p.velocity.x); w.f32(p.velocity.y); w.u32(p.acknowledged_input); w.u32(p.color); w.string(p.name,24); w.u8(p.alive?1:0); w.f32(p.facing_angle); w.u64(p.respawn_at_us); w.u64(p.protected_until_us); }
+    w.u16(static_cast<std::uint16_t>(std::min(s.projectiles.size(), kMaxProjectiles)));
+    for(std::size_t i=0;i<std::min(s.projectiles.size(),kMaxProjectiles);++i){const auto & p=s.projectiles[i];w.u32(p.id);w.u32(p.owner_id);w.f32(p.position.x);w.f32(p.position.y);w.f32(p.velocity.x);w.f32(p.velocity.y);w.f32(p.angle);}
     return w.bytes();
 }
 Snapshot read_snapshot(Reader & r) {
     Snapshot s{}; s.server_time_us=r.u64(); s.server_tick=r.u32(); const auto count=r.u8(); if(count>kMaxPlayers) fail("Too many players in snapshot"); s.players.reserve(count);
-    for(std::uint8_t i=0;i<count;++i){ PlayerState p{}; p.id=r.u32(); p.position={r.f32(),r.f32()}; p.velocity={r.f32(),r.f32()}; p.acknowledged_input=r.u32(); p.color=r.u32(); p.name=r.string(24); s.players.push_back(std::move(p)); } return s;
+    const auto finite=[](Vec2f v){return std::isfinite(v.x)&&std::isfinite(v.y);};
+    for(std::uint8_t i=0;i<count;++i){ PlayerState p{}; p.id=r.u32(); p.position={r.f32(),r.f32()}; p.velocity={r.f32(),r.f32()}; p.acknowledged_input=r.u32(); p.color=r.u32(); p.name=r.string(24);p.alive=r.u8()!=0;p.facing_angle=r.f32();p.respawn_at_us=r.u64();p.protected_until_us=r.u64();if(!finite(p.position)||!finite(p.velocity)||!std::isfinite(p.facing_angle))fail("Non-finite player state");s.players.push_back(std::move(p)); }
+    const auto projectile_count=r.u16();if(projectile_count>kMaxProjectiles)fail("Too many projectiles in snapshot");s.projectiles.reserve(projectile_count);for(std::uint16_t i=0;i<projectile_count;++i){ProjectileState p{};p.id=r.u32();p.owner_id=r.u32();p.position={r.f32(),r.f32()};p.velocity={r.f32(),r.f32()};p.angle=r.f32();if(!finite(p.position)||!finite(p.velocity)||!std::isfinite(p.angle))fail("Non-finite projectile state");s.projectiles.push_back(p);}return s;
 }
 std::vector<std::uint8_t> make_clock_ping(std::uint64_t t) { Writer w(MessageType::clock_ping); w.u64(t); return w.bytes(); }
 std::vector<std::uint8_t> make_clock_pong(std::uint64_t c, std::uint64_t r, std::uint64_t s) { Writer w(MessageType::clock_pong); w.u64(c); w.u64(r); w.u64(s); return w.bytes(); }
 std::vector<std::uint8_t> make_ready() { Writer w(MessageType::ready); return w.bytes(); }
 std::vector<std::uint8_t> make_song_schedule(const SongSchedule & s) { Writer w(MessageType::song_schedule); w.u64(s.server_start_us); w.u32(s.duration_ms); w.f32(s.bpm); w.i32(s.first_beat_ms); w.u16(s.subdivision); w.string(s.song_id, 64); const auto count=static_cast<std::uint32_t>(std::min(s.note_times_ms.size(),kMaxRhythmNotes)); w.u32(count); for(std::uint32_t i=0;i<count;++i)w.u32(s.note_times_ms[i]); return w.bytes(); }
 SongSchedule read_song_schedule(Reader & r) { SongSchedule s{}; s.server_start_us=r.u64(); s.duration_ms=r.u32(); s.bpm=r.f32(); s.first_beat_ms=r.i32(); s.subdivision=r.u16(); s.song_id=r.string(64); const auto count=r.u32(); if(count>kMaxRhythmNotes)fail("Too many rhythm notes"); s.note_times_ms.reserve(count); for(std::uint32_t i=0;i<count;++i){const auto t=r.u32();if(t>s.duration_ms||(!s.note_times_ms.empty()&&t<=s.note_times_ms.back()))fail("Invalid rhythm note chart");s.note_times_ms.push_back(t);} return s; }
-std::vector<std::uint8_t> make_rhythm_hit(std::uint32_t seq, std::uint64_t t, std::int16_t calibration) { Writer w(MessageType::rhythm_hit); w.u32(seq); w.u64(t); w.i16(calibration); return w.bytes(); }
-std::vector<std::uint8_t> make_rhythm_result(const RhythmResult & r) { Writer w(MessageType::rhythm_result); w.u8(static_cast<std::uint8_t>(r.grade)); w.i32(r.offset_ms); w.u32(r.perfect); w.u32(r.good); w.u32(r.miss); w.u32(r.note_index); w.u32(r.combo); w.u32(r.max_combo); w.u8(r.overstrum?1:0); return w.bytes(); }
-RhythmResult read_rhythm_result(Reader & r) { RhythmResult v{}; v.grade=static_cast<RhythmGrade>(r.u8()); v.offset_ms=r.i32(); v.perfect=r.u32(); v.good=r.u32(); v.miss=r.u32(); v.note_index=r.u32(); v.combo=r.u32(); v.max_combo=r.u32(); v.overstrum=r.u8()!=0; return v; }
+std::vector<std::uint8_t> make_rhythm_hit(std::uint32_t seq, std::uint64_t t, std::int16_t calibration, Vec2f aim) { Writer w(MessageType::rhythm_hit); w.u32(seq); w.u64(t); w.i16(calibration);w.f32(aim.x);w.f32(aim.y);return w.bytes(); }
+std::vector<std::uint8_t> make_rhythm_result(const RhythmResult & r) { Writer w(MessageType::rhythm_result); w.u8(static_cast<std::uint8_t>(r.grade)); w.i32(r.offset_ms); w.u32(r.perfect); w.u32(r.good); w.u32(r.miss); w.u32(r.note_index); w.u32(r.combo); w.u32(r.max_combo); w.u8(r.overstrum?1:0);w.u8(r.shot_fired?1:0);return w.bytes(); }
+RhythmResult read_rhythm_result(Reader & r) { RhythmResult v{}; v.grade=static_cast<RhythmGrade>(r.u8()); v.offset_ms=r.i32(); v.perfect=r.u32(); v.good=r.u32(); v.miss=r.u32(); v.note_index=r.u32(); v.combo=r.u32(); v.max_combo=r.u32(); v.overstrum=r.u8()!=0;v.shot_fired=r.u8()!=0;return v; }
 std::uint64_t monotonic_time_us() { return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
 const char * grade_name(RhythmGrade grade) { switch(grade){case RhythmGrade::perfect:return "Perfect";case RhythmGrade::good:return "Good";default:return "Miss";} }
 

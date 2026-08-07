@@ -98,16 +98,34 @@ void Application::tick_frame(float dt_seconds) {
     const net::Snapshot & snapshot = network_.snapshot();
     if (!snapshot.players.empty()) {
         std::vector<NetworkUnitState> units;
-        units.reserve(snapshot.players.size());
+        units.reserve(snapshot.players.size()+snapshot.projectiles.size());
+        UnitId render_id=0;
         for (const net::PlayerState & player : snapshot.players) {
+            const bool just_respawned=player.id==network_.player_id()&&!local_alive_&&player.alive;
+            if(player.id==network_.player_id()){local_alive_=player.alive;local_respawn_at_us_=player.respawn_at_us;if(just_respawned){predicted_position_=player.position;have_predicted_position_=true;}}
+            if(!player.alive)continue;
             Vec2f position = player.position;
             if (player.id == network_.player_id()) {
                 if (!have_predicted_position_) { predicted_position_ = position; have_predicted_position_ = true; }
                 else { predicted_position_ += (position - predicted_position_) * 0.18f; }
                 position = predicted_position_;
             }
-            units.push_back({player.id, position, 49u + (player.id % 5u)});
+            NetworkUnitState unit{};
+            unit.id = player.id;
+            unit.position = position;
+            unit.sprite_index = 49u + (player.id % 5u);
+            unit.rotation_radians = player.facing_angle;
+            if (player.protected_until_us > snapshot.server_time_us &&
+                ((snapshot.server_time_us / 100000) % 2) == 0) {
+                unit.solid_color = true;
+                unit.color[0] = 0.3f;
+                unit.color[1] = 0.9f;
+                unit.color[2] = 1.0f;
+            }
+            units.push_back(unit);
+            if (player.id > render_id) render_id = player.id;
         }
+        for(const net::ProjectileState & p:snapshot.projectiles){NetworkUnitState unit{};unit.id=++render_id;unit.position=p.position;unit.sprite_index=1000001u;unit.size={18.0f,6.0f};unit.rotation_radians=p.angle;unit.solid_color=true;unit.color[0]=1.0f;unit.color[1]=0.85f;unit.color[2]=0.15f;units.push_back(unit);}
         world_.replace_network_units(units);
         world_.set_local_unit(network_.player_id());
     }
@@ -115,7 +133,7 @@ void Application::tick_frame(float dt_seconds) {
     Vec2f movement{};
     movement.x = static_cast<float>(input.move_right) - static_cast<float>(input.move_left);
     movement.y = static_cast<float>(input.move_up) - static_cast<float>(input.move_down);
-    movement = normalize_or_zero(movement);
+    movement = local_alive_?normalize_or_zero(movement):Vec2f{};
     if (have_predicted_position_) {
         const Vec2f candidate = predicted_position_ + movement * (net::kMoveSpeed * dt_seconds);
         if (!world_.collision().blocks_segment(predicted_position_, candidate)) predicted_position_ = candidate;
@@ -129,7 +147,7 @@ void Application::tick_frame(float dt_seconds) {
         network_.send_input(static_cast<std::int8_t>(movement.x * 127.0f), static_cast<std::int8_t>(movement.y * 127.0f));
     }
     const std::uint64_t rhythm_now_us=net::monotonic_time_us();
-    if (input.space_pressed) { rhythm_hud_.predict_hit(rhythm_now_us,config_.calibration_ms);network_.send_rhythm_hit(config_.calibration_ms); }
+    if(input.left_mouse_pressed&&local_alive_){const Vec2f target=screen_to_world(input.mouse_x,input.mouse_y,input.window_width,input.window_height,camera_controller_.state());const Vec2f aim=normalize_or_zero(target-predicted_position_);rhythm_hud_.predict_hit(rhythm_now_us,config_.calibration_ms);network_.send_rhythm_hit(config_.calibration_ms,aim);}
     net::SongSchedule schedule{};
     if(network_.take_song_schedule(schedule)) {
         const auto local_start = static_cast<std::uint64_t>(static_cast<std::int64_t>(schedule.server_start_us) - network_.server_offset_us());
@@ -180,11 +198,12 @@ std::string Application::build_overlay_text() const {
     const CameraState & camera = camera_controller_.state();
 
     overlay << "GAMER_TIME NETWORK ARENA\n";
-    overlay << "ESC quit | WASD move | SPACE rhythm | wheel zoom | F3 collision | F4 solid terrain | F5 fog\n\n";
+    overlay << "ESC quit | WASD move | LEFT CLICK rhythm/fire | wheel zoom | F3 collision | F4 solid terrain | F5 fog\n\n";
     overlay << "Network: " << network_.status() << " | Player ID: " << network_.player_id() << '\n';
     overlay << "Server clock offset: " << network_.server_offset_us() / 1000 << " ms\n";
     overlay << "Audio: " << (song_player_.error().empty() ? "ready" : song_player_.error()) << '\n';
-    if(have_rhythm_result_) overlay << "Last hit: " << net::grade_name(last_rhythm_result_.grade) << " (" << last_rhythm_result_.offset_ms << " ms) | P/G/M " << last_rhythm_result_.perfect << "/" << last_rhythm_result_.good << "/" << last_rhythm_result_.miss << '\n';
+    if(have_rhythm_result_) overlay << "Last hit: " << net::grade_name(last_rhythm_result_.grade) << " (" << last_rhythm_result_.offset_ms << " ms) | "<<(last_rhythm_result_.shot_fired?"SHOT":"NO SHOT")<<" | P/G/M " << last_rhythm_result_.perfect << "/" << last_rhythm_result_.good << "/" << last_rhythm_result_.miss << '\n';
+    if(!local_alive_){const auto now=network_.server_time_us();const auto remaining=local_respawn_at_us_>now?local_respawn_at_us_-now:0;overlay<<"RESPAWNING IN "<<(remaining+999999)/1000000<<"\n";}
     const std::string rhythm_feedback=rhythm_hud_.feedback(net::monotonic_time_us());
     if(!rhythm_feedback.empty())overlay<<"RHYTHM: "<<rhythm_feedback<<" | Max combo "<<last_rhythm_result_.max_combo<<'\n';
     overlay << "Map size: " << world_.map().width() << "x" << world_.map().height() << " tiles\n";

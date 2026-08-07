@@ -22,6 +22,9 @@ struct RenderUnit {
     std::uint32_t sprite_index = 0;
     bool visible_in_fog = true;
     bool selected = false;
+    float rotation_radians = 0.0f;
+    bool solid_color = false;
+    float color[4]{1.0f,1.0f,1.0f,1.0f};
 };
 
 struct RenderTile {

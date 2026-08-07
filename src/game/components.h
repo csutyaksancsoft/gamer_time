@@ -14,6 +14,9 @@ struct TransformComponent {
 struct RenderComponent {
     std::uint32_t sprite_index = 0;
     Vec2f footprint{24.0f, 24.0f};
+    float rotation_radians = 0.0f;
+    bool solid_color = false;
+    float color[4]{1.0f,1.0f,1.0f,1.0f};
 };
 
 struct VisionComponent {

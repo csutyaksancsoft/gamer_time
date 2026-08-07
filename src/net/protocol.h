@@ -10,8 +10,9 @@
 
 namespace net {
 
-constexpr std::uint32_t kProtocolVersion = 2;
+constexpr std::uint32_t kProtocolVersion = 3;
 constexpr std::size_t kMaxRhythmNotes = 4096;
+constexpr std::size_t kMaxProjectiles = 1024;
 constexpr std::uint16_t kDefaultPort = 27020;
 constexpr std::size_t kMaxPlayers = 64;
 constexpr float kMoveSpeed = 160.0f;
@@ -41,12 +42,25 @@ struct PlayerState {
     std::uint32_t acknowledged_input = 0;
     std::uint32_t color = 0xffffffffu;
     std::string name;
+    bool alive = true;
+    float facing_angle = 0.0f;
+    std::uint64_t respawn_at_us = 0;
+    std::uint64_t protected_until_us = 0;
+};
+
+struct ProjectileState {
+    std::uint32_t id = 0;
+    PlayerId owner_id = 0;
+    Vec2f position{};
+    Vec2f velocity{};
+    float angle = 0.0f;
 };
 
 struct Snapshot {
     std::uint64_t server_time_us = 0;
     std::uint32_t server_tick = 0;
     std::vector<PlayerState> players;
+    std::vector<ProjectileState> projectiles;
 };
 
 struct SongSchedule {
@@ -69,6 +83,7 @@ struct RhythmResult {
     std::uint32_t combo = 0;
     std::uint32_t max_combo = 0;
     bool overstrum = false;
+    bool shot_fired = false;
 };
 
 class Writer {
@@ -116,7 +131,7 @@ std::vector<std::uint8_t> make_clock_pong(std::uint64_t client_send_us, std::uin
 std::vector<std::uint8_t> make_ready();
 std::vector<std::uint8_t> make_song_schedule(const SongSchedule & schedule);
 SongSchedule read_song_schedule(Reader & reader);
-std::vector<std::uint8_t> make_rhythm_hit(std::uint32_t sequence, std::uint64_t client_time_us, std::int16_t calibration_ms);
+std::vector<std::uint8_t> make_rhythm_hit(std::uint32_t sequence, std::uint64_t client_time_us, std::int16_t calibration_ms, Vec2f aim);
 std::vector<std::uint8_t> make_rhythm_result(const RhythmResult & result);
 RhythmResult read_rhythm_result(Reader & reader);
 
