@@ -50,8 +50,7 @@ private:
     std::uint64_t best_rtt_us_ = UINT64_MAX;
     bool has_schedule_ = false;
     SongSchedule schedule_{};
-    bool has_rhythm_result_ = false;
-    RhythmResult rhythm_result_{};
+    std::deque<RhythmResult> rhythm_results_;
     std::string name_;
     ENetAddress address_{};
     std::uint64_t reconnect_deadline_us_ = 0;

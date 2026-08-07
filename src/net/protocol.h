@@ -10,7 +10,8 @@
 
 namespace net {
 
-constexpr std::uint32_t kProtocolVersion = 1;
+constexpr std::uint32_t kProtocolVersion = 2;
+constexpr std::size_t kMaxRhythmNotes = 4096;
 constexpr std::uint16_t kDefaultPort = 27020;
 constexpr std::size_t kMaxPlayers = 64;
 constexpr float kMoveSpeed = 160.0f;
@@ -54,6 +55,8 @@ struct SongSchedule {
     float bpm = 120.0f;
     std::int32_t first_beat_ms = 0;
     std::uint16_t subdivision = 1;
+    std::string song_id;
+    std::vector<std::uint32_t> note_times_ms;
 };
 
 struct RhythmResult {
@@ -62,6 +65,10 @@ struct RhythmResult {
     std::uint32_t perfect = 0;
     std::uint32_t good = 0;
     std::uint32_t miss = 0;
+    std::uint32_t note_index = UINT32_MAX;
+    std::uint32_t combo = 0;
+    std::uint32_t max_combo = 0;
+    bool overstrum = false;
 };
 
 class Writer {

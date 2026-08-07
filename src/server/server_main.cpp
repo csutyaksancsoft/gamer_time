@@ -4,6 +4,7 @@
 #include "game/map_world.h"
 #include "net/protocol.h"
 #include "rhythm/song_config.h"
+#include "rhythm/rhythm_judgment.h"
 
 #include <enet/enet.h>
 
@@ -14,6 +15,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 #ifndef _WIN32
 #include <sys/select.h>
@@ -34,7 +36,8 @@ struct Player {
     bool ready = false;
     bool active = true;
     net::RhythmResult score{};
-    std::int64_t last_event = -1;
+    std::vector<std::uint8_t> judged_notes;
+    std::size_t next_expiring_note = 0;
 };
 
 bool terminal_line_ready() {
@@ -68,14 +71,14 @@ Vec2f spawn_for(std::uint32_t index, const MapWorld & map, const CollisionWorld 
 }
 
 net::RhythmResult grade_hit(Player & player, std::uint64_t hit_us, std::int16_t calibration_ms, const net::SongSchedule & song) {
-    const double interval_us=60000000.0/(static_cast<double>(song.bpm)*song.subdivision);
-    const double relative=static_cast<double>(static_cast<std::int64_t>(hit_us)-static_cast<std::int64_t>(song.server_start_us)-static_cast<std::int64_t>(calibration_ms)*1000-song.first_beat_ms*1000LL);
-    const auto event=static_cast<std::int64_t>(std::llround(relative/interval_us));
-    const auto offset=static_cast<std::int32_t>(std::llround((relative-event*interval_us)/1000.0));
-    net::RhythmGrade grade=net::RhythmGrade::miss;
-    if(event>=0 && event!=player.last_event){ const int absolute=std::abs(offset); if(absolute<=35) grade=net::RhythmGrade::perfect; else if(absolute<=80) grade=net::RhythmGrade::good; }
-    if(grade==net::RhythmGrade::perfect){++player.score.perfect;player.last_event=event;} else if(grade==net::RhythmGrade::good){++player.score.good;player.last_event=event;} else ++player.score.miss;
-    player.score.grade=grade;player.score.offset_ms=offset;return player.score;
+    constexpr std::int64_t kGoodWindowMs=80;
+    const std::int64_t relative_ms=(static_cast<std::int64_t>(hit_us)-static_cast<std::int64_t>(song.server_start_us))/1000-calibration_ms;
+    std::size_t best=song.note_times_ms.size();std::int64_t best_abs=kGoodWindowMs+1;std::int32_t best_offset=0;
+    for(std::size_t i=0;i<song.note_times_ms.size();++i){if(i<player.judged_notes.size()&&player.judged_notes[i])continue;const auto offset=static_cast<std::int32_t>(relative_ms-static_cast<std::int64_t>(song.note_times_ms[i]));const auto absolute=std::llabs(static_cast<long long>(offset));if(absolute<best_abs){best=i;best_abs=absolute;best_offset=offset;}}
+    player.score.note_index=UINT32_MAX;player.score.offset_ms=best_offset;player.score.overstrum=best>=song.note_times_ms.size();
+    if(best<song.note_times_ms.size()&&best_abs<=kGoodWindowMs){player.judged_notes[best]=1;player.score.note_index=static_cast<std::uint32_t>(best);player.score.overstrum=false;player.score.grade=rhythm::grade_offset(best_offset);if(player.score.grade==net::RhythmGrade::perfect)++player.score.perfect;else ++player.score.good;++player.score.combo;player.score.max_combo=std::max(player.score.max_combo,player.score.combo);}
+    else{player.score.grade=net::RhythmGrade::miss;++player.score.miss;player.score.combo=0;player.score.overstrum=true;}
+    return player.score;
 }
 
 } // namespace
@@ -84,6 +87,7 @@ int main(int argc,char ** argv) try {
     std::string bind="0.0.0.0:27020", map_path="assets/maps/grass_tileset_map.tmx", song_path="assets/audio/song.cfg";
     for(int i=1;i<argc;++i){const std::string arg=argv[i];if(arg=="--bind"&&i+1<argc)bind=argv[++i];else if(arg=="--map"&&i+1<argc)map_path=argv[++i];else if(arg=="--song"&&i+1<argc)song_path=argv[++i];else fail("Usage: gamer_time_server [--bind host:port] [--map path] [--song path]");}
     const MapWorld map=MapWorld::from_tmx(assets::load_tmx_map(map_path)); const CollisionWorld collision=CollisionWorld::from_map(map); const SongConfig song_config=load_song_config(song_path);
+    const auto slash=song_path.find_last_of("/\\");const std::string song_dir=slash==std::string::npos?".":song_path.substr(0,slash);const auto chart=load_note_chart(song_dir+"/"+song_config.chart,song_config.duration_ms);
     if(enet_initialize()!=0) fail("ENet initialization failed");
     const auto [host_name,port]=split_endpoint(bind); ENetAddress address{}; address.port=port;
     if(host_name=="0.0.0.0") address.host=ENET_HOST_ANY; else if(enet_address_set_host(&address,host_name.c_str())!=0) fail("Invalid bind address");
@@ -108,9 +112,11 @@ int main(int argc,char ** argv) try {
         constexpr float dt=1.0f/60.0f;
         for(auto & [peer,player]:players){if(!player.active)continue;Vec2f direction=normalize_or_zero({player.input_x/127.0f,player.input_y/127.0f});player.velocity=direction*net::kMoveSpeed;Vec2f candidate=player.position+player.velocity*dt;if(collision.blocks_segment(player.position,candidate)){candidate=player.position;player.velocity={};}
             bool blocked=false;for(const auto & [other_peer,other]:players){if(other_peer!=peer&&other.active&&length_squared(candidate-other.position)<16.0f*16.0f){blocked=true;break;}}if(!blocked)player.position=candidate;else player.velocity={};}
-        const auto now=net::monotonic_time_us();if(room==net::RoomState::countdown&&now>=song.server_start_us)room=net::RoomState::playing;if(room==net::RoomState::playing&&now>=song.server_start_us+song.duration_ms*1000ULL)room=net::RoomState::free_move;
+        const auto now=net::monotonic_time_us();if(room==net::RoomState::countdown&&now>=song.server_start_us)room=net::RoomState::playing;
+        if(room==net::RoomState::playing){for(auto & [peer,p]:players){while(p.next_expiring_note<song.note_times_ms.size()&&now>song.server_start_us+(static_cast<std::uint64_t>(song.note_times_ms[p.next_expiring_note])+80)*1000ULL){const auto index=p.next_expiring_note++;if(index<p.judged_notes.size()&&!p.judged_notes[index]){p.judged_notes[index]=1;p.score.grade=net::RhythmGrade::miss;p.score.offset_ms=80;p.score.note_index=static_cast<std::uint32_t>(index);p.score.combo=0;p.score.overstrum=false;++p.score.miss;send_packet(peer,net::make_rhythm_result(p.score),true);}}}}
+        if(room==net::RoomState::playing&&now>=song.server_start_us+song.duration_ms*1000ULL)room=net::RoomState::free_move;
         if(tick%3==0){net::Snapshot snapshot{};snapshot.server_time_us=now;snapshot.server_tick=tick;for(const auto & [peer,p]:players){(void)peer;if(p.active)snapshot.players.push_back({p.id,p.position,p.velocity,p.input_sequence,p.color,p.name});}const auto bytes=net::make_snapshot(snapshot);for(auto & [peer,p]:players){(void)p;send_packet(peer,bytes,false);}}
-        if(terminal_line_ready()){std::string line;std::getline(std::cin,line);if(line=="quit")running=false;else if(line=="status")std::cout<<players.size()<<" players, tick "<<tick<<", room "<<static_cast<int>(room)<<"\n";else if(line=="stop")room=net::RoomState::free_move;else if(line=="start"){const bool all_ready=std::all_of(players.begin(),players.end(),[](const auto & entry){return entry.second.ready;});if(players.empty()||!all_ready)std::cout<<"Start refused: all connected clients must be ready\n";else{song={now+3000000ULL,song_config.duration_ms,song_config.bpm,song_config.first_beat_ms,song_config.subdivision};room=net::RoomState::countdown;for(auto & [peer,p]:players){p.last_event=-1;p.active=true;send_packet(peer,net::make_song_schedule(song),true);}std::cout<<"Song scheduled in 3 seconds\n";}}else if(line.rfind("kick ",0)==0){const auto id=static_cast<net::PlayerId>(std::stoul(line.substr(5)));for(auto & [peer,p]:players)if(p.id==id){enet_peer_disconnect(peer,0);break;}}}
+        if(terminal_line_ready()){std::string line;std::getline(std::cin,line);if(line=="quit")running=false;else if(line=="status")std::cout<<players.size()<<" players, tick "<<tick<<", room "<<static_cast<int>(room)<<"\n";else if(line=="stop")room=net::RoomState::free_move;else if(line=="start"){const bool all_ready=std::all_of(players.begin(),players.end(),[](const auto & entry){return entry.second.ready;});if(players.empty()||!all_ready)std::cout<<"Start refused: all connected clients must be ready\n";else{song={now+3000000ULL,song_config.duration_ms,song_config.bpm,song_config.first_beat_ms,song_config.subdivision,song_config.id,chart};room=net::RoomState::countdown;for(auto & [peer,p]:players){p.score={};p.judged_notes.assign(chart.size(),0);p.next_expiring_note=0;p.active=true;send_packet(peer,net::make_song_schedule(song),true);}std::cout<<"Song scheduled in 3 seconds\n";}}else if(line.rfind("kick ",0)==0){const auto id=static_cast<net::PlayerId>(std::stoul(line.substr(5)));for(auto & [peer,p]:players)if(p.id==id){enet_peer_disconnect(peer,0);break;}}}
         enet_host_flush(host);++tick;next_tick+=std::chrono::microseconds(16667);std::this_thread::sleep_until(next_tick);
     }
     enet_host_destroy(host);enet_deinitialize();return 0;

@@ -128,14 +128,16 @@ void Application::tick_frame(float dt_seconds) {
         input_send_accumulator_ = 0.0f;
         network_.send_input(static_cast<std::int8_t>(movement.x * 127.0f), static_cast<std::int8_t>(movement.y * 127.0f));
     }
-    if (input.space_pressed) network_.send_rhythm_hit(config_.calibration_ms);
+    const std::uint64_t rhythm_now_us=net::monotonic_time_us();
+    if (input.space_pressed) { rhythm_hud_.predict_hit(rhythm_now_us,config_.calibration_ms);network_.send_rhythm_hit(config_.calibration_ms); }
     net::SongSchedule schedule{};
     if(network_.take_song_schedule(schedule)) {
         const auto local_start = static_cast<std::uint64_t>(static_cast<std::int64_t>(schedule.server_start_us) - network_.server_offset_us());
         song_player_.schedule(local_start);
+        rhythm_hud_.schedule(schedule,local_start);
     }
-    song_player_.update(net::monotonic_time_us());
-    if(network_.take_rhythm_result(last_rhythm_result_)) have_rhythm_result_=true;
+    song_player_.update(rhythm_now_us);
+    while(network_.take_rhythm_result(last_rhythm_result_)){have_rhythm_result_=true;rhythm_hud_.apply_result(last_rhythm_result_,rhythm_now_us);}
     fog_of_war_system_.update(world_);
     RenderWorld render_world = render_extractor_.build(
         world_,
@@ -147,6 +149,7 @@ void Application::tick_frame(float dt_seconds) {
     projection_system_.run(render_world, input.window_width, input.window_height);
     depth_sorter_.run(render_world);
     RenderBatch batch = batch_builder_.build(render_world);
+    rhythm_hud_.append_instances(batch,input.window_width,input.window_height,rhythm_now_us);
 
     scene_renderer_.upload_frame_resources(
         batch,
@@ -182,6 +185,8 @@ std::string Application::build_overlay_text() const {
     overlay << "Server clock offset: " << network_.server_offset_us() / 1000 << " ms\n";
     overlay << "Audio: " << (song_player_.error().empty() ? "ready" : song_player_.error()) << '\n';
     if(have_rhythm_result_) overlay << "Last hit: " << net::grade_name(last_rhythm_result_.grade) << " (" << last_rhythm_result_.offset_ms << " ms) | P/G/M " << last_rhythm_result_.perfect << "/" << last_rhythm_result_.good << "/" << last_rhythm_result_.miss << '\n';
+    const std::string rhythm_feedback=rhythm_hud_.feedback(net::monotonic_time_us());
+    if(!rhythm_feedback.empty())overlay<<"RHYTHM: "<<rhythm_feedback<<" | Max combo "<<last_rhythm_result_.max_combo<<'\n';
     overlay << "Map size: " << world_.map().width() << "x" << world_.map().height() << " tiles\n";
     overlay << "Units: " << world_.unit_count() << '\n';
     overlay << "Tile layers: " << world_.map().tile_layers().size() << '\n';

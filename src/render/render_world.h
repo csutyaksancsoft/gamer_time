@@ -12,6 +12,8 @@ constexpr std::uint32_t kInstanceFlagSelected = 1u << 0;
 constexpr std::uint32_t kInstanceFlagDebugCollision = 1u << 1;
 constexpr std::uint32_t kInstanceFlagIgnoreFog = 1u << 2;
 constexpr std::uint32_t kInstanceFlagTerrain = 1u << 3;
+constexpr std::uint32_t kInstanceFlagScreenSpace = 1u << 4;
+constexpr std::uint32_t kInstanceFlagSolidColor = 1u << 5;
 
 struct RenderUnit {
     UnitId id = 0;
@@ -63,6 +65,7 @@ struct InstanceData {
     std::uint32_t flags = 0;
     float opacity = 1.0f;
     float rotation_radians = 0.0f;
+    float color[4]{1.0f, 1.0f, 1.0f, 1.0f};
 };
 
 struct RenderBatch {

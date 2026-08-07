@@ -103,7 +103,7 @@ void Client::receive(std::span<const std::uint8_t> bytes) {
         break;
     }
     case MessageType::song_schedule: schedule_ = read_song_schedule(reader); has_schedule_ = true; break;
-    case MessageType::rhythm_result: rhythm_result_ = read_rhythm_result(reader); has_rhythm_result_ = true; break;
+    case MessageType::rhythm_result: rhythm_results_.push_back(read_rhythm_result(reader)); break;
     default: break;
     }
 }
@@ -111,6 +111,6 @@ void Client::receive(std::span<const std::uint8_t> bytes) {
 void Client::send_input(std::int8_t x, std::int8_t y) { send(make_input(++input_sequence_, x, y, monotonic_time_us()), false); }
 void Client::send_rhythm_hit(std::int16_t calibration_ms) { send(make_rhythm_hit(++rhythm_sequence_, server_time_us(), calibration_ms), true); }
 bool Client::take_song_schedule(SongSchedule & schedule) { if(!has_schedule_) return false; schedule=schedule_; has_schedule_=false; return true; }
-bool Client::take_rhythm_result(RhythmResult & result) { if(!has_rhythm_result_) return false; result=rhythm_result_; has_rhythm_result_=false; return true; }
+bool Client::take_rhythm_result(RhythmResult & result) { if(rhythm_results_.empty()) return false; result=rhythm_results_.front(); rhythm_results_.pop_front(); return true; }
 
 } // namespace net

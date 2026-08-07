@@ -41,7 +41,7 @@ add_library(gt_map STATIC
 gt_configure_target(gt_map)
 target_link_libraries(gt_map PUBLIC gt_core)
 
-add_library(gt_rhythm STATIC src/rhythm/song_config.cpp)
+    add_library(gt_rhythm STATIC src/rhythm/song_config.cpp)
 gt_configure_target(gt_rhythm)
 target_link_libraries(gt_rhythm PUBLIC gt_core)
 
@@ -126,9 +126,18 @@ if(GT_BUILD_CLIENT)
         src/render/projection_system.cpp
         src/render/render_extractor.cpp
         src/render/scene_renderer.cpp
+        src/rhythm/rhythm_hud.cpp
     )
     gt_configure_target(gt_render)
-    target_link_libraries(gt_render PUBLIC gt_core gt_game gt_gpu gt_platform)
+    target_link_libraries(gt_render PUBLIC gt_core gt_game gt_gpu gt_platform gt_net)
+
+    if(BUILD_TESTING)
+        add_executable(gt_rhythm_tests tests/rhythm_tests.cpp)
+        gt_configure_target(gt_rhythm_tests)
+        target_compile_definitions(gt_rhythm_tests PRIVATE GT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+        target_link_libraries(gt_rhythm_tests PRIVATE gt_render gt_rhythm)
+        add_test(NAME rhythm_gameplay COMMAND gt_rhythm_tests)
+    endif()
 
     add_library(gt_app STATIC src/app/application.cpp)
     gt_configure_target(gt_app)

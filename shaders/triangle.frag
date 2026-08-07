@@ -21,6 +21,7 @@ layout(location = 2) flat in uint vSpriteIndex;
 layout(location = 3) flat in uint vFlags;
 layout(location = 4) in vec2 vAtlasUv;
 layout(location = 5) in float vOpacity;
+layout(location = 6) flat in vec4 vColor;
 layout(location = 0) out vec4 outColor;
 
 vec3 fallback_color(uint spriteIndex) {
@@ -36,6 +37,11 @@ void main() {
     vec4 atlasColor = texture(uSceneAtlas, vAtlasUv);
     vec3 color = atlasColor.rgb;
     float alpha = atlasColor.a * clamp(vOpacity, 0.0, 1.0);
+
+    if ((vFlags & 32u) != 0u) {
+        color = vColor.rgb;
+        alpha = vColor.a * clamp(vOpacity, 0.0, 1.0);
+    }
 
     if (scene.solidTerrainDebug != 0u && (vFlags & 8u) != 0u) {
         color = fallback_color(vSpriteIndex);

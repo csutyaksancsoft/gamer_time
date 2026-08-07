@@ -11,6 +11,7 @@
 #include "platform/sdl_platform.h"
 #include "platform/song_player.h"
 #include "rhythm/song_config.h"
+#include "rhythm/rhythm_hud.h"
 #include "render/batch_builder.h"
 #include "render/depth_sorter.h"
 #include "render/frustum_culler.h"
@@ -43,6 +44,7 @@ private:
     net::Client network_;
     SongPlayer song_player_;
     SongConfig song_config_{};
+    RhythmHud rhythm_hud_;
     FogOfWarSystem fog_of_war_system_;
     RenderExtractor render_extractor_;
     FrustumCuller frustum_culler_;
