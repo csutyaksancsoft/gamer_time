@@ -8,7 +8,7 @@
 
 namespace {
 
-constexpr const char * kDefaultMapPath = "assets/maps/grass_tileset_map.tmx";
+constexpr const char * kDefaultMapName = "maps/grass_tileset_map.tmx";
 
 } // namespace
 
@@ -43,7 +43,8 @@ void Application::initialize() {
 
     platform_.initialize(config_);
     scene_renderer_.initialize(platform_.window(), config_.shader_dir);
-    const TmxMapAsset map_asset = assets::load_tmx_map(kDefaultMapPath);
+    const std::string map_path = config_.asset_dir + "/" + kDefaultMapName;
+    const TmxMapAsset map_asset = assets::load_tmx_map(map_path);
     world_.set_map(MapWorld::from_tmx(map_asset));
     scene_atlas_ = assets::build_atlas_from_tmx(map_asset, assets::resolve_tmx_tileset_image_path(map_asset));
     scene_atlas_image_ = assets::load_png_rgba(scene_atlas_.image_path);
@@ -51,10 +52,6 @@ void Application::initialize() {
     scene_atlas_.rows = scene_atlas_image_.height / scene_atlas_.tile_height;
     scene_renderer_.initialize_scene_atlas(scene_atlas_, scene_atlas_image_);
     world_.seed_test_units();
-
-    if (!config_.model_path.empty()) {
-        llama_controller_.start(config_.model_path);
-    }
 
     initialized_ = true;
 }
@@ -65,7 +62,6 @@ void Application::shutdown() {
     }
 
     scene_renderer_.shutdown();
-    llama_controller_.shutdown();
     platform_.shutdown();
 
     initialized_ = false;
@@ -100,14 +96,10 @@ void Application::tick_frame(float dt_seconds) {
     world_.command_queue().apply(world_);
     navigation_system_.update(world_, dt_seconds);
     fog_of_war_system_.update(world_);
-    maybe_submit_prompt(input);
-    recent_ai_events_ = collect_ai_events();
-
     RenderWorld render_world = render_extractor_.build(
         world_,
         camera_controller_.state(),
         show_collision_debug_,
-        recent_ai_events_,
         build_overlay_text()
     );
     frustum_culler_.run(render_world, input.window_width, input.window_height);
@@ -128,13 +120,6 @@ void Application::tick_frame(float dt_seconds) {
 }
 
 void Application::update_window_title(const RenderBatch & batch) const {
-    std::string status = last_ai_status_.empty() ? std::string("idle") : last_ai_status_;
-    if (llama_controller_.is_loading()) {
-        status = "loading";
-    } else if (llama_controller_.is_ready() && status == "idle") {
-        status = "ready";
-    }
-
     std::string title = "gamer_time | units: ";
     title += std::to_string(world_.unit_count());
     title += " | tiles: ";
@@ -143,14 +128,6 @@ void Application::update_window_title(const RenderBatch & batch) const {
     title += std::to_string(batch.unit_instance_count);
     title += " | selected: ";
     title += std::to_string(world_.selected_units().size());
-    title += " | llama: ";
-    title += status;
-
-    if (!last_ai_result_.empty()) {
-        title += " | ";
-        title += last_ai_result_.substr(0, 80);
-    }
-
     platform_.set_window_title(title.c_str());
 }
 
@@ -159,7 +136,7 @@ std::string Application::build_overlay_text() const {
     const CameraState & camera = camera_controller_.state();
 
     overlay << "GAMER_TIME RTS FRAMEWORK\n";
-    overlay << "ESC quit | SPACE rerun prompt | F3 collision debug | click select | right click move | WASD/Arrows pan | wheel zoom\n\n";
+    overlay << "ESC quit | F3 collision debug | click select | right click move | WASD/Arrows pan | wheel zoom\n\n";
     overlay << "Map size: " << world_.map().width() << "x" << world_.map().height() << " tiles\n";
     overlay << "Units: " << world_.unit_count() << '\n';
     overlay << "Tile layers: " << world_.map().tile_layers().size() << '\n';
@@ -172,84 +149,7 @@ std::string Application::build_overlay_text() const {
     overlay << "Fog cells visible: " << std::count(world_.fog_mask().begin(), world_.fog_mask().end(), static_cast<std::uint8_t>(255)) << "\n";
     overlay << "Uploaded instances: " << scene_renderer_.resources().staged_instances().size() << "\n";
     overlay << "Scene atlas grid: " << scene_atlas_.columns << "x" << scene_atlas_.rows << "\n";
-    overlay << "Fog texture size: " << scene_renderer_.resources().fog_texture().width << "x" << scene_renderer_.resources().fog_texture().height << "\n\n";
-
-    if (config_.model_path.empty()) {
-        overlay << "No model path provided. Pass a GGUF path on the command line to enable worker-thread output.\n";
-        return overlay.str();
-    }
-
-    overlay << "Worker: ";
-    overlay << (last_ai_status_.empty() ? std::string("idle") : last_ai_status_) << "\n\n";
-
-    if (!last_ai_result_.empty()) {
-        overlay << last_ai_result_;
-    } else if (llama_controller_.is_loading()) {
-        overlay << "Loading model...\n";
-    } else if (submitted_demo_prompt_) {
-        overlay << "Waiting for sample prompt output...\n";
-    } else {
-        overlay << "Waiting for llama.cpp to become ready...\n";
-    }
+    overlay << "Fog texture size: " << scene_renderer_.resources().fog_texture().width << "x" << scene_renderer_.resources().fog_texture().height << '\n';
 
     return overlay.str();
-}
-
-void Application::maybe_submit_prompt(const InputState & input) {
-    if (!submitted_demo_prompt_ && llama_controller_.is_ready() && !config_.model_path.empty()) {
-        last_ai_result_.clear();
-        llama_controller_.submit_prompt(
-            "Write one sentence about keeping an RTS renderer smooth while gameplay and inference run concurrently.",
-            48
-        );
-        submitted_demo_prompt_ = true;
-        return;
-    }
-
-    if (input.space_pressed && llama_controller_.is_ready()) {
-        last_ai_result_.clear();
-        llama_controller_.submit_prompt(
-            "Give me a short status line for an RTS framework with Vulkan rendering and a worker-thread llama model.",
-            32
-        );
-    }
-}
-
-std::vector<std::string> Application::collect_ai_events() {
-    std::vector<std::string> events_for_render;
-
-    for (const AiEvent & event : llama_controller_.drain_events()) {
-        switch (event.type) {
-        case AiEventType::Status:
-            last_ai_status_ = event.text;
-            if (event.text == "Running inference...") {
-                last_ai_result_.clear();
-            }
-            if (!event.text.empty()) {
-                events_for_render.push_back("status: " + event.text);
-            }
-            break;
-        case AiEventType::Completed:
-            last_ai_result_ = event.text;
-            if (!event.text.empty()) {
-                events_for_render.push_back(event.text.substr(0, 80));
-            }
-            break;
-        case AiEventType::Error:
-            last_ai_status_ = "error";
-            last_ai_result_ = event.text;
-            events_for_render.push_back("error: " + event.text);
-            break;
-        case AiEventType::Token:
-            last_ai_result_ += event.text;
-            events_for_render.push_back(event.text);
-            break;
-        }
-    }
-
-    if (events_for_render.size() > 4) {
-        events_for_render.erase(events_for_render.begin(), events_for_render.end() - 4);
-    }
-
-    return events_for_render;
 }

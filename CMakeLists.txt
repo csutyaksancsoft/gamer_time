@@ -1,36 +1,30 @@
 cmake_minimum_required(VERSION 3.24...4.0)
 
-project(SDL3_Vulkan_Llama LANGUAGES C CXX)
+cmake_policy(SET CMP0091 NEW)
+
+project(gamer_time LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(ENABLE_LLAMACPP_VULKAN "Enable Vulkan backend for llama.cpp" ON)
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
 
 set(SDL_SHARED OFF CACHE BOOL "" FORCE)
 set(SDL_STATIC ON CACHE BOOL "" FORCE)
 set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
 set(SDL_TESTS OFF CACHE BOOL "" FORCE)
+
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/SDL/CMakeLists.txt")
+    message(FATAL_ERROR
+        "SDL source is missing. Run scripts/build-windows.ps1 or initialize the SDL submodule."
+    )
+endif()
+
 add_subdirectory(external/SDL)
-
 find_package(Vulkan REQUIRED)
-
-if(ENABLE_LLAMACPP_VULKAN)
-    set(GGML_VULKAN ON CACHE BOOL "" FORCE)
-else()
-    set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
-endif()
-
-set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
-set(LLAMA_BUILD_COMMON OFF CACHE BOOL "" FORCE)
-add_subdirectory(external/llama.cpp)
-
-if(UNIX AND NOT APPLE)
-    find_package(Threads REQUIRED)
-endif()
 
 function(gt_configure_target target_name)
     target_include_directories(${target_name} PUBLIC
@@ -57,21 +51,8 @@ add_library(gt_assets STATIC
 gt_configure_target(gt_assets)
 target_link_libraries(gt_assets PUBLIC
     gt_core
+    SDL3::SDL3-static
 )
-
-add_library(gt_ai STATIC
-    src/ai/llama_controller.cpp
-    src/ai/token_stream.cpp
-    src/llama_worker.cpp
-)
-gt_configure_target(gt_ai)
-target_link_libraries(gt_ai PUBLIC
-    gt_core
-    llama
-)
-if(UNIX AND NOT APPLE)
-    target_link_libraries(gt_ai PUBLIC Threads::Threads dl)
-endif()
 
 add_library(gt_platform STATIC
     src/platform/camera_controller.cpp
@@ -137,60 +118,103 @@ add_library(gt_app STATIC
 )
 gt_configure_target(gt_app)
 target_link_libraries(gt_app PUBLIC
-    gt_ai
     gt_assets
     gt_game
     gt_platform
     gt_render
 )
 
-add_executable(game
-    src/main.cpp
+if(WIN32)
+    add_executable(gamer_time WIN32 src/main.cpp)
+else()
+    add_executable(gamer_time src/main.cpp)
+endif()
+gt_configure_target(gamer_time)
+target_link_libraries(gamer_time PRIVATE gt_app)
+
+set(SHADER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/shaders")
+set(SHADER_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders")
+set(SHADER_NAMES
+    triangle.vert
+    triangle.frag
+    text.vert
+    text.frag
 )
-gt_configure_target(game)
-target_link_libraries(game PRIVATE
-    gt_app
-)
 
-set(DEFAULT_MODEL_PATH "../model/Qwen3-VL-4B-Instruct-Q4_K_M.gguf")
-set(SHADER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/shaders")
-
-find_program(GLSLANG_VALIDATOR glslangValidator)
-
-set(SHADER_SOURCES
-    "${SHADER_DIR}/triangle.vert"
-    "${SHADER_DIR}/triangle.frag"
-    "${SHADER_DIR}/text.vert"
-    "${SHADER_DIR}/text.frag"
+find_program(GLSLANG_VALIDATOR glslangValidator
+    HINTS "$ENV{VULKAN_SDK}/Bin" "$ENV{VULKAN_SDK}/bin"
 )
 
 set(SPIRV_OUTPUTS "")
-if(GLSLANG_VALIDATOR)
-    foreach(SHADER ${SHADER_SOURCES})
-        get_filename_component(SHADER_NAME ${SHADER} NAME)
-        set(SPIRV "${SHADER}.spv")
+foreach(SHADER_NAME IN LISTS SHADER_NAMES)
+    set(SHADER_SOURCE "${SHADER_SOURCE_DIR}/${SHADER_NAME}")
+    set(SPIRV_SOURCE "${SHADER_SOURCE}.spv")
+    set(SPIRV_OUTPUT "${SHADER_OUTPUT_DIR}/${SHADER_NAME}.spv")
 
+    if(GLSLANG_VALIDATOR)
         add_custom_command(
-            OUTPUT "${SPIRV}"
-            COMMAND "${GLSLANG_VALIDATOR}" -V "${SHADER}" -o "${SPIRV}"
-            DEPENDS "${SHADER}"
+            OUTPUT "${SPIRV_OUTPUT}"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${SHADER_OUTPUT_DIR}"
+            COMMAND "${GLSLANG_VALIDATOR}" -V "${SHADER_SOURCE}" -o "${SPIRV_OUTPUT}"
+            DEPENDS "${SHADER_SOURCE}"
             COMMENT "Compiling shader ${SHADER_NAME}"
             VERBATIM
         )
+    else()
+        add_custom_command(
+            OUTPUT "${SPIRV_OUTPUT}"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${SHADER_OUTPUT_DIR}"
+            COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SPIRV_SOURCE}" "${SPIRV_OUTPUT}"
+            DEPENDS "${SPIRV_SOURCE}"
+            COMMENT "Copying precompiled shader ${SHADER_NAME}.spv"
+            VERBATIM
+        )
+    endif()
 
-        list(APPEND SPIRV_OUTPUTS "${SPIRV}")
-    endforeach()
+    list(APPEND SPIRV_OUTPUTS "${SPIRV_OUTPUT}")
+endforeach()
 
-    add_custom_target(shaders ALL DEPENDS ${SPIRV_OUTPUTS})
-    add_dependencies(game shaders)
-else()
-    message(WARNING "glslangValidator not found. Shader .spv files will not be built automatically.")
-endif()
+add_custom_target(shaders ALL DEPENDS ${SPIRV_OUTPUTS})
+add_dependencies(gamer_time shaders)
+
+add_custom_command(TARGET gamer_time POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory
+        "${SHADER_OUTPUT_DIR}"
+        "$<TARGET_FILE_DIR:gamer_time>/shaders"
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+        "$<TARGET_FILE_DIR:gamer_time>/assets"
+    COMMENT "Copying runtime shaders and game assets beside gamer_time"
+    VERBATIM
+)
 
 add_custom_target(run
-    COMMAND $<TARGET_FILE:game> "${DEFAULT_MODEL_PATH}" "${SHADER_DIR}"
-    DEPENDS game
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMAND $<TARGET_FILE:gamer_time>
+    DEPENDS gamer_time
+    WORKING_DIRECTORY "$<TARGET_FILE_DIR:gamer_time>"
     USES_TERMINAL
-    COMMENT "Running game with default model: ${DEFAULT_MODEL_PATH}"
+    COMMENT "Running gamer_time"
 )
+
+install(TARGETS gamer_time RUNTIME DESTINATION .)
+install(DIRECTORY "${SHADER_OUTPUT_DIR}/" DESTINATION shaders
+    FILES_MATCHING PATTERN "*.spv"
+)
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets/" DESTINATION assets)
+install(FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
+    "${CMAKE_CURRENT_SOURCE_DIR}/external/SDL/LICENSE.txt"
+    DESTINATION licenses
+)
+
+set(CPACK_GENERATOR ZIP)
+set(CPACK_PACKAGE_NAME "gamer-time")
+if(WIN32)
+    set(CPACK_PACKAGE_FILE_NAME "gamer-time-windows-x64")
+else()
+    set(CPACK_PACKAGE_FILE_NAME
+        "gamer-time-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}"
+    )
+endif()
+set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
+include(CPack)

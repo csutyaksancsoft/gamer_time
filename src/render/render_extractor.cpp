@@ -9,21 +9,11 @@ RenderWorld RenderExtractor::build(
     const World & world,
     const CameraState & camera,
     bool show_collision_debug,
-    const std::vector<std::string> & ai_events,
     std::string overlay_text
 ) const {
     RenderWorld render_world{};
     render_world.camera = camera;
     render_world.overlay_text = std::move(overlay_text);
-
-    if (!ai_events.empty()) {
-        render_world.overlay_text += "\n\nRecent AI Events:\n";
-        for (const std::string & event : ai_events) {
-            render_world.overlay_text += "- ";
-            render_world.overlay_text += event;
-            render_world.overlay_text += '\n';
-        }
-    }
 
     const MapWorld & map = world.map();
     render_world.terrain_layers.reserve(map.tile_layers().size());

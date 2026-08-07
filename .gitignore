@@ -42,4 +42,5 @@
 
 
 build/
-build-codex
+build-codex/
+build-windows*/

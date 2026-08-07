@@ -5,8 +5,8 @@
 #include <string>
 
 struct RuntimeConfig {
-    std::string model_path;
     std::string shader_dir = "shaders";
+    std::string asset_dir = "assets";
     int initial_width = kInitialWidth;
     int initial_height = kInitialHeight;
 };

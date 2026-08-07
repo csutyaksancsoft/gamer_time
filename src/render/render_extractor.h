@@ -3,7 +3,6 @@
 #include "render/render_world.h"
 
 #include <string>
-#include <vector>
 
 class World;
 
@@ -13,7 +12,6 @@ public:
         const World & world,
         const CameraState & camera,
         bool show_collision_debug,
-        const std::vector<std::string> & ai_events,
         std::string overlay_text
     ) const;
 };
