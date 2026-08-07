@@ -55,6 +55,7 @@ void World::replace_network_units(const std::vector<NetworkUnitState> & network_
         renders_[state.id].footprint=state.size;
         renders_[state.id].rotation_radians=state.rotation_radians;
         renders_[state.id].solid_color=state.solid_color;
+        renders_[state.id].circle_outline=state.circle_outline;
         std::copy(std::begin(state.color),std::end(state.color),std::begin(renders_[state.id].color));
         visions_[state.id] = {112.0f};
     }

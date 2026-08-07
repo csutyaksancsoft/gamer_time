@@ -108,6 +108,7 @@ struct NetworkUnitState {
     Vec2f size{16.0f,16.0f};
     float rotation_radians = 0.0f;
     bool solid_color = false;
+    bool circle_outline = false;
     float opacity = 1.0f;
     float color[4]{1.0f,1.0f,1.0f,1.0f};
 };

@@ -10,7 +10,7 @@
 
 namespace net {
 
-constexpr std::uint32_t kProtocolVersion = 3;
+constexpr std::uint32_t kProtocolVersion = 4;
 constexpr std::size_t kMaxRhythmNotes = 4096;
 constexpr std::size_t kMaxProjectiles = 1024;
 constexpr std::uint16_t kDefaultPort = 27020;
@@ -46,6 +46,7 @@ struct PlayerState {
     float facing_angle = 0.0f;
     std::uint64_t respawn_at_us = 0;
     std::uint64_t protected_until_us = 0;
+    std::uint64_t shield_until_us = 0;
 };
 
 struct ProjectileState {

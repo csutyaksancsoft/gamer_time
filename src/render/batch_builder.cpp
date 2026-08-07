@@ -41,7 +41,8 @@ RenderBatch BatchBuilder::build(const RenderWorld & render_world) const {
         instance.size = projected.source.size;
         instance.sprite_index = projected.source.sprite_index;
         instance.flags = projected.source.selected ? kInstanceFlagSelected : 0u;
-        if(projected.source.solid_color)instance.flags|=kInstanceFlagSolidColor|kInstanceFlagIgnoreFog;
+        if(projected.source.solid_color)instance.flags|=kInstanceFlagSolidColor;
+        if(projected.source.circle_outline)instance.flags|=kInstanceFlagCircleOutline;
         instance.opacity = 1.0f;
         instance.rotation_radians=projected.source.rotation_radians;
         for(int i=0;i<4;++i)instance.color[i]=projected.source.color[i];

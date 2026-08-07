@@ -48,7 +48,7 @@ std::vector<std::uint8_t> make_welcome(PlayerId id, Vec2f spawn) { Writer w(Mess
 std::vector<std::uint8_t> make_input(std::uint32_t seq, std::int8_t x, std::int8_t y, std::uint64_t time) { Writer w(MessageType::input); w.u32(seq); w.u8(static_cast<std::uint8_t>(x)); w.u8(static_cast<std::uint8_t>(y)); w.u64(time); return w.bytes(); }
 std::vector<std::uint8_t> make_snapshot(const Snapshot & s) {
     Writer w(MessageType::snapshot); w.u64(s.server_time_us); w.u32(s.server_tick); w.u8(static_cast<std::uint8_t>(std::min(s.players.size(), kMaxPlayers)));
-    for (std::size_t i = 0; i < std::min(s.players.size(), kMaxPlayers); ++i) { const auto & p=s.players[i]; w.u32(p.id); w.f32(p.position.x); w.f32(p.position.y); w.f32(p.velocity.x); w.f32(p.velocity.y); w.u32(p.acknowledged_input); w.u32(p.color); w.string(p.name,24); w.u8(p.alive?1:0); w.f32(p.facing_angle); w.u64(p.respawn_at_us); w.u64(p.protected_until_us); }
+    for (std::size_t i = 0; i < std::min(s.players.size(), kMaxPlayers); ++i) { const auto & p=s.players[i]; w.u32(p.id); w.f32(p.position.x); w.f32(p.position.y); w.f32(p.velocity.x); w.f32(p.velocity.y); w.u32(p.acknowledged_input); w.u32(p.color); w.string(p.name,24); w.u8(p.alive?1:0); w.f32(p.facing_angle); w.u64(p.respawn_at_us); w.u64(p.protected_until_us);w.u64(p.shield_until_us); }
     w.u16(static_cast<std::uint16_t>(std::min(s.projectiles.size(), kMaxProjectiles)));
     for(std::size_t i=0;i<std::min(s.projectiles.size(),kMaxProjectiles);++i){const auto & p=s.projectiles[i];w.u32(p.id);w.u32(p.owner_id);w.f32(p.position.x);w.f32(p.position.y);w.f32(p.velocity.x);w.f32(p.velocity.y);w.f32(p.angle);}
     return w.bytes();
@@ -56,7 +56,7 @@ std::vector<std::uint8_t> make_snapshot(const Snapshot & s) {
 Snapshot read_snapshot(Reader & r) {
     Snapshot s{}; s.server_time_us=r.u64(); s.server_tick=r.u32(); const auto count=r.u8(); if(count>kMaxPlayers) fail("Too many players in snapshot"); s.players.reserve(count);
     const auto finite=[](Vec2f v){return std::isfinite(v.x)&&std::isfinite(v.y);};
-    for(std::uint8_t i=0;i<count;++i){ PlayerState p{}; p.id=r.u32(); p.position={r.f32(),r.f32()}; p.velocity={r.f32(),r.f32()}; p.acknowledged_input=r.u32(); p.color=r.u32(); p.name=r.string(24);p.alive=r.u8()!=0;p.facing_angle=r.f32();p.respawn_at_us=r.u64();p.protected_until_us=r.u64();if(!finite(p.position)||!finite(p.velocity)||!std::isfinite(p.facing_angle))fail("Non-finite player state");s.players.push_back(std::move(p)); }
+    for(std::uint8_t i=0;i<count;++i){ PlayerState p{}; p.id=r.u32(); p.position={r.f32(),r.f32()}; p.velocity={r.f32(),r.f32()}; p.acknowledged_input=r.u32(); p.color=r.u32(); p.name=r.string(24);p.alive=r.u8()!=0;p.facing_angle=r.f32();p.respawn_at_us=r.u64();p.protected_until_us=r.u64();p.shield_until_us=r.u64();if(!finite(p.position)||!finite(p.velocity)||!std::isfinite(p.facing_angle))fail("Non-finite player state");s.players.push_back(std::move(p)); }
     const auto projectile_count=r.u16();if(projectile_count>kMaxProjectiles)fail("Too many projectiles in snapshot");s.projectiles.reserve(projectile_count);for(std::uint16_t i=0;i<projectile_count;++i){ProjectileState p{};p.id=r.u32();p.owner_id=r.u32();p.position={r.f32(),r.f32()};p.velocity={r.f32(),r.f32()};p.angle=r.f32();if(!finite(p.position)||!finite(p.velocity)||!std::isfinite(p.angle))fail("Non-finite projectile state");s.projectiles.push_back(p);}return s;
 }
 std::vector<std::uint8_t> make_clock_ping(std::uint64_t t) { Writer w(MessageType::clock_ping); w.u64(t); return w.bytes(); }

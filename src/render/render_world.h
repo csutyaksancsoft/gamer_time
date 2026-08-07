@@ -14,6 +14,7 @@ constexpr std::uint32_t kInstanceFlagIgnoreFog = 1u << 2;
 constexpr std::uint32_t kInstanceFlagTerrain = 1u << 3;
 constexpr std::uint32_t kInstanceFlagScreenSpace = 1u << 4;
 constexpr std::uint32_t kInstanceFlagSolidColor = 1u << 5;
+constexpr std::uint32_t kInstanceFlagCircleOutline = 1u << 6;
 
 struct RenderUnit {
     UnitId id = 0;
@@ -24,6 +25,7 @@ struct RenderUnit {
     bool selected = false;
     float rotation_radians = 0.0f;
     bool solid_color = false;
+    bool circle_outline = false;
     float color[4]{1.0f,1.0f,1.0f,1.0f};
 };
 

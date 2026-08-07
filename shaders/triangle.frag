@@ -43,6 +43,14 @@ void main() {
         alpha = vColor.a * clamp(vOpacity, 0.0, 1.0);
     }
 
+    if ((vFlags & 64u) != 0u) {
+        float radius = distance(vUv, vec2(0.5));
+        float ring = 1.0 - smoothstep(0.40, 0.48, radius);
+        ring *= smoothstep(0.31, 0.39, radius);
+        alpha *= ring;
+        if (alpha <= 0.001) discard;
+    }
+
     if (scene.solidTerrainDebug != 0u && (vFlags & 8u) != 0u) {
         color = fallback_color(vSpriteIndex);
         alpha = clamp(vOpacity, 0.0, 1.0);
@@ -65,7 +73,8 @@ void main() {
             vec2(1.0)
         );
         float fogValue = texture(uFogMask, fogUv).r;
-        color *= mix(0.85, 1.0, fogValue);
+        color *= fogValue;
+        alpha *= fogValue;
     }
 
     outColor = vec4(color, alpha);
