@@ -56,6 +56,7 @@ private:
     bool initialized_ = false;
     bool show_collision_debug_ = true;
     bool solid_terrain_debug_ = false;
+    bool overlay_text_visible_ = false;
     AtlasAsset scene_atlas_;
     LoadedImage scene_atlas_image_;
     std::chrono::steady_clock::time_point last_tick_{};

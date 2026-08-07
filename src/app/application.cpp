@@ -91,6 +91,7 @@ void Application::tick_frame(float dt_seconds) {
         show_collision_debug_ = !show_collision_debug_;
     }
     if (input.toggle_terrain_debug_pressed) solid_terrain_debug_ = !solid_terrain_debug_;
+    if (input.toggle_text_pressed) overlay_text_visible_ = !overlay_text_visible_;
     scene_renderer_.set_debug_modes(solid_terrain_debug_, true);
 
     network_.update();
@@ -99,10 +100,10 @@ void Application::tick_frame(float dt_seconds) {
         std::vector<NetworkUnitState> units;
         units.reserve(snapshot.players.size()+snapshot.projectiles.size());
         UnitId render_id=0;
+        for(const net::PlayerState & player:snapshot.players){if(player.id>render_id)render_id=player.id;}
         for (const net::PlayerState & player : snapshot.players) {
             const bool just_respawned=player.id==network_.player_id()&&!local_alive_&&player.alive;
             if(player.id==network_.player_id()){local_alive_=player.alive;local_respawn_at_us_=player.respawn_at_us;if(just_respawned){predicted_position_=player.position;have_predicted_position_=true;}}
-            if(player.id!=network_.player_id())continue;
             if(!player.alive)continue;
             Vec2f position = player.position;
             if (player.id == network_.player_id()) {
@@ -123,7 +124,6 @@ void Application::tick_frame(float dt_seconds) {
                 unit.color[2] = 1.0f;
             }
             units.push_back(unit);
-            if (player.id > render_id) render_id = player.id;
             if(player.shield_until_us>snapshot.server_time_us){NetworkUnitState shield{};shield.id=++render_id;shield.position=position;shield.size={40.0f,40.0f};shield.solid_color=true;shield.circle_outline=true;shield.color[0]=0.1f;shield.color[1]=0.55f;shield.color[2]=1.0f;shield.color[3]=0.42f;units.push_back(shield);}
         }
         for(const net::ProjectileState & p:snapshot.projectiles){NetworkUnitState unit{};unit.id=++render_id;unit.position=p.position;unit.sprite_index=1000001u;unit.size={18.0f,6.0f};unit.rotation_radians=p.angle;unit.solid_color=true;unit.color[0]=1.0f;unit.color[1]=0.85f;unit.color[2]=0.15f;units.push_back(unit);}
@@ -163,7 +163,7 @@ void Application::tick_frame(float dt_seconds) {
         world_,
         camera_controller_.state(),
         show_collision_debug_,
-        build_overlay_text()
+        overlay_text_visible_ ? build_overlay_text() : std::string{}
     );
     frustum_culler_.run(render_world, input.window_width, input.window_height);
     projection_system_.run(render_world, input.window_width, input.window_height);
@@ -200,7 +200,7 @@ std::string Application::build_overlay_text() const {
     const CameraState & camera = camera_controller_.state();
 
     overlay << "GAMER_TIME NETWORK ARENA\n";
-    overlay << "ESC quit | WASD move | LEFT CLICK fire | RIGHT CLICK shield | wheel zoom | F3 collision | F4 solid terrain\n\n";
+    overlay << "ESC quit | WASD move | LEFT CLICK fire | RIGHT CLICK shield | wheel zoom | F3 collision | F4 solid terrain | F5 text\n\n";
     overlay << "Network: " << network_.status() << " | Player ID: " << network_.player_id() << '\n';
     overlay << "Server clock offset: " << network_.server_offset_us() / 1000 << " ms\n";
     overlay << "Audio: " << (song_player_.error().empty() ? "ready" : song_player_.error()) << '\n';

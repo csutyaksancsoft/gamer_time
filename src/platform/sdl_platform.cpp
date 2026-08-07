@@ -83,6 +83,7 @@ InputState SdlPlatform::poll_input() {
                 input.toggle_collision_debug_pressed = true;
             }
             if (event.key.key == SDLK_F4) input.toggle_terrain_debug_pressed = true;
+            if (event.key.key == SDLK_F5) input.toggle_text_pressed = true;
             if (event.key.key == SDLK_A || event.key.key == SDLK_LEFT) {
                 input.move_left = true;
             }
