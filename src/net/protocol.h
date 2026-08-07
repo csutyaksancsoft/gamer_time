@@ -10,7 +10,7 @@
 
 namespace net {
 
-constexpr std::uint32_t kProtocolVersion = 4;
+constexpr std::uint32_t kProtocolVersion = 5;
 constexpr std::size_t kMaxRhythmNotes = 4096;
 constexpr std::size_t kMaxProjectiles = 1024;
 constexpr std::uint16_t kDefaultPort = 27020;
@@ -34,6 +34,7 @@ enum class MessageType : std::uint8_t {
 
 enum class RoomState : std::uint8_t { lobby, countdown, playing, free_move };
 enum class RhythmGrade : std::uint8_t { perfect, good, miss };
+enum class RhythmAction : std::uint8_t { shoot, shield };
 
 struct PlayerState {
     PlayerId id = 0;
@@ -85,6 +86,7 @@ struct RhythmResult {
     std::uint32_t max_combo = 0;
     bool overstrum = false;
     bool shot_fired = false;
+    bool shield_activated = false;
 };
 
 class Writer {
@@ -132,7 +134,7 @@ std::vector<std::uint8_t> make_clock_pong(std::uint64_t client_send_us, std::uin
 std::vector<std::uint8_t> make_ready();
 std::vector<std::uint8_t> make_song_schedule(const SongSchedule & schedule);
 SongSchedule read_song_schedule(Reader & reader);
-std::vector<std::uint8_t> make_rhythm_hit(std::uint32_t sequence, std::uint64_t client_time_us, std::int16_t calibration_ms, Vec2f aim);
+std::vector<std::uint8_t> make_rhythm_hit(std::uint32_t sequence, std::uint64_t client_time_us, std::int16_t calibration_ms, Vec2f aim, RhythmAction action);
 std::vector<std::uint8_t> make_rhythm_result(const RhythmResult & result);
 RhythmResult read_rhythm_result(Reader & reader);
 

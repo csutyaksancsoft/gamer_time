@@ -148,7 +148,8 @@ void Application::tick_frame(float dt_seconds) {
         network_.send_input(static_cast<std::int8_t>(movement.x * 127.0f), static_cast<std::int8_t>(movement.y * 127.0f));
     }
     const std::uint64_t rhythm_now_us=net::monotonic_time_us();
-    if(input.left_mouse_pressed&&local_alive_){const Vec2f target=screen_to_world(input.mouse_x,input.mouse_y,input.window_width,input.window_height,camera_controller_.state());const Vec2f aim=normalize_or_zero(target-predicted_position_);rhythm_hud_.predict_hit(rhythm_now_us,config_.calibration_ms);network_.send_rhythm_hit(config_.calibration_ms,aim);}
+    if(input.left_mouse_pressed&&local_alive_){const Vec2f target=screen_to_world(input.mouse_x,input.mouse_y,input.window_width,input.window_height,camera_controller_.state());const Vec2f aim=normalize_or_zero(target-predicted_position_);rhythm_hud_.predict_hit(rhythm_now_us,config_.calibration_ms);network_.send_rhythm_hit(config_.calibration_ms,aim,net::RhythmAction::shoot);}
+    else if(input.right_mouse_pressed&&local_alive_){rhythm_hud_.predict_hit(rhythm_now_us,config_.calibration_ms);network_.send_rhythm_hit(config_.calibration_ms,{},net::RhythmAction::shield);}
     net::SongSchedule schedule{};
     if(network_.take_song_schedule(schedule)) {
         const auto local_start = static_cast<std::uint64_t>(static_cast<std::int64_t>(schedule.server_start_us) - network_.server_offset_us());
@@ -199,11 +200,11 @@ std::string Application::build_overlay_text() const {
     const CameraState & camera = camera_controller_.state();
 
     overlay << "GAMER_TIME NETWORK ARENA\n";
-    overlay << "ESC quit | WASD move | LEFT CLICK rhythm/fire/shield | wheel zoom | F3 collision | F4 solid terrain\n\n";
+    overlay << "ESC quit | WASD move | LEFT CLICK fire | RIGHT CLICK shield | wheel zoom | F3 collision | F4 solid terrain\n\n";
     overlay << "Network: " << network_.status() << " | Player ID: " << network_.player_id() << '\n';
     overlay << "Server clock offset: " << network_.server_offset_us() / 1000 << " ms\n";
     overlay << "Audio: " << (song_player_.error().empty() ? "ready" : song_player_.error()) << '\n';
-    if(have_rhythm_result_) overlay << "Last hit: " << net::grade_name(last_rhythm_result_.grade) << " (" << last_rhythm_result_.offset_ms << " ms) | "<<(last_rhythm_result_.shot_fired?"SHOT":"NO SHOT")<<" | P/G/M " << last_rhythm_result_.perfect << "/" << last_rhythm_result_.good << "/" << last_rhythm_result_.miss << '\n';
+    if(have_rhythm_result_) overlay << "Last hit: " << net::grade_name(last_rhythm_result_.grade) << " (" << last_rhythm_result_.offset_ms << " ms) | "<<(last_rhythm_result_.shot_fired?"SHOT":last_rhythm_result_.shield_activated?"SHIELD":"NO ACTION")<<" | P/G/M " << last_rhythm_result_.perfect << "/" << last_rhythm_result_.good << "/" << last_rhythm_result_.miss << '\n';
     if(!local_alive_){const auto now=network_.server_time_us();const auto remaining=local_respawn_at_us_>now?local_respawn_at_us_-now:0;overlay<<"RESPAWNING IN "<<(remaining+999999)/1000000<<"\n";}
     const std::string rhythm_feedback=rhythm_hud_.feedback(net::monotonic_time_us());
     if(!rhythm_feedback.empty())overlay<<"RHYTHM: "<<rhythm_feedback<<" | Max combo "<<last_rhythm_result_.max_combo<<'\n';

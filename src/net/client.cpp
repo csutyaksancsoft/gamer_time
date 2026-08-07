@@ -109,7 +109,7 @@ void Client::receive(std::span<const std::uint8_t> bytes) {
 }
 
 void Client::send_input(std::int8_t x, std::int8_t y) { send(make_input(++input_sequence_, x, y, monotonic_time_us()), false); }
-void Client::send_rhythm_hit(std::int16_t calibration_ms, Vec2f aim) { send(make_rhythm_hit(++rhythm_sequence_, server_time_us(), calibration_ms, aim), true); }
+void Client::send_rhythm_hit(std::int16_t calibration_ms, Vec2f aim, RhythmAction action) { send(make_rhythm_hit(++rhythm_sequence_, server_time_us(), calibration_ms, aim, action), true); }
 bool Client::take_song_schedule(SongSchedule & schedule) { if(!has_schedule_) return false; schedule=schedule_; has_schedule_=false; return true; }
 bool Client::take_rhythm_result(RhythmResult & result) { if(rhythm_results_.empty()) return false; result=rhythm_results_.front(); rhythm_results_.pop_front(); return true; }
 

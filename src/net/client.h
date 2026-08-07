@@ -18,7 +18,7 @@ public:
     void disconnect();
     void update();
     void send_input(std::int8_t x, std::int8_t y);
-    void send_rhythm_hit(std::int16_t calibration_ms, Vec2f aim);
+    void send_rhythm_hit(std::int16_t calibration_ms, Vec2f aim, RhythmAction action);
 
     bool connected() const { return connected_; }
     bool welcomed() const { return player_id_ != 0; }
