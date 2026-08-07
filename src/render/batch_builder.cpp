@@ -23,6 +23,7 @@ RenderBatch BatchBuilder::build(const RenderWorld & render_world) const {
             instance.world_pos = tile.world_pos;
             instance.size = tile.size;
             instance.sprite_index = tile.atlas_index;
+            instance.flags = kInstanceFlagTerrain;
             instance.opacity = layer.opacity;
             batch.instances.push_back(instance);
         }

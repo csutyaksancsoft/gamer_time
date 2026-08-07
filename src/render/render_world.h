@@ -11,6 +11,7 @@
 constexpr std::uint32_t kInstanceFlagSelected = 1u << 0;
 constexpr std::uint32_t kInstanceFlagDebugCollision = 1u << 1;
 constexpr std::uint32_t kInstanceFlagIgnoreFog = 1u << 2;
+constexpr std::uint32_t kInstanceFlagTerrain = 1u << 3;
 
 struct RenderUnit {
     UnitId id = 0;

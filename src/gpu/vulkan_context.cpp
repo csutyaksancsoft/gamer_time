@@ -1,6 +1,9 @@
 #include "gpu/vulkan_context.h"
 
 #include <set>
+#include <algorithm>
+#include <cstring>
+#include <iostream>
 
 namespace {
 
@@ -67,6 +70,23 @@ void VulkanContext::create_instance() {
     create_info.pApplicationInfo = &app_info;
     create_info.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
     create_info.ppEnabledExtensionNames = extensions.data();
+
+#ifndef NDEBUG
+    constexpr const char * kValidationLayer = "VK_LAYER_KHRONOS_validation";
+    uint32_t layer_count = 0;
+    vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
+    std::vector<VkLayerProperties> layers(layer_count);
+    vkEnumerateInstanceLayerProperties(&layer_count, layers.data());
+    const bool validation_installed = std::any_of(layers.begin(), layers.end(), [](const VkLayerProperties & layer) {
+        return std::strcmp(layer.layerName, kValidationLayer) == 0;
+    });
+    if (validation_installed) {
+        create_info.enabledLayerCount = 1;
+        create_info.ppEnabledLayerNames = &kValidationLayer;
+    } else {
+        std::cerr << "Vulkan validation layer is not installed; continuing without validation\n";
+    }
+#endif
 
     check_vk(vkCreateInstance(&create_info, nullptr, &instance_), "Failed to create Vulkan instance");
 }

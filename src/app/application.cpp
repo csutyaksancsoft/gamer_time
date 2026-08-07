@@ -90,6 +90,9 @@ void Application::tick_frame(float dt_seconds) {
     if (input.toggle_collision_debug_pressed) {
         show_collision_debug_ = !show_collision_debug_;
     }
+    if (input.toggle_terrain_debug_pressed) solid_terrain_debug_ = !solid_terrain_debug_;
+    if (input.toggle_fog_pressed) fog_enabled_ = !fog_enabled_;
+    scene_renderer_.set_debug_modes(solid_terrain_debug_, fog_enabled_);
 
     network_.update();
     const net::Snapshot & snapshot = network_.snapshot();
@@ -174,7 +177,7 @@ std::string Application::build_overlay_text() const {
     const CameraState & camera = camera_controller_.state();
 
     overlay << "GAMER_TIME NETWORK ARENA\n";
-    overlay << "ESC quit | WASD move | SPACE rhythm | wheel zoom | F3 collision debug\n\n";
+    overlay << "ESC quit | WASD move | SPACE rhythm | wheel zoom | F3 collision | F4 solid terrain | F5 fog\n\n";
     overlay << "Network: " << network_.status() << " | Player ID: " << network_.player_id() << '\n';
     overlay << "Server clock offset: " << network_.server_offset_us() / 1000 << " ms\n";
     overlay << "Audio: " << (song_player_.error().empty() ? "ready" : song_player_.error()) << '\n';
@@ -186,9 +189,17 @@ std::string Application::build_overlay_text() const {
     overlay << "Terrain tiles: " << world_.map().total_tile_count() << '\n';
     overlay << "Collision polygons: " << world_.collision().polygon_count() << '\n';
     overlay << "Collision debug: " << (show_collision_debug_ ? "on" : "off") << '\n';
-    overlay << "Camera: (" << static_cast<int>(camera.world_center.x) << ", " << static_cast<int>(camera.world_center.y) << ") zoom " << camera.zoom << "\n";
+    const Vec2f snapped = scene_renderer_.snapped_camera_position();
+    overlay << "Render debug: solid terrain " << (solid_terrain_debug_ ? "on" : "off") << " | fog " << (fog_enabled_ ? "on" : "off") << '\n';
+    overlay << "Camera snapped: (" << snapped.x << ", " << snapped.y << ") zoom " << camera.zoom << "\n";
     overlay << "Fog cells visible: " << std::count(world_.fog_mask().begin(), world_.fog_mask().end(), static_cast<std::uint8_t>(255)) << "\n";
-    overlay << "Uploaded instances: " << scene_renderer_.resources().staged_instances().size() << "\n";
+    const RenderBatch & batch = scene_renderer_.staged_batch();
+    const auto & frame = scene_renderer_.resources().frame_instance_buffer(scene_renderer_.current_frame_index());
+    overlay << "Instances: terrain " << batch.terrain_instance_count << " | units " << batch.unit_instance_count
+            << " | debug " << batch.debug_instance_count << " | total " << batch.instances.size() << '\n';
+    overlay << "Frame buffer: uploaded " << frame.uploaded_bytes << " B | capacity " << frame.capacity_bytes
+            << " B | reallocations " << frame.reallocation_count << '\n';
+    if (!scene_renderer_.frame_diagnostic().empty()) overlay << "GPU: " << scene_renderer_.frame_diagnostic() << '\n';
     overlay << "Scene atlas grid: " << scene_atlas_.columns << "x" << scene_atlas_.rows << "\n";
     overlay << "Fog texture size: " << scene_renderer_.resources().fog_texture().width << "x" << scene_renderer_.resources().fog_texture().height << '\n';
 

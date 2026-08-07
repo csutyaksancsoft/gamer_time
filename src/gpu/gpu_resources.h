@@ -7,10 +7,19 @@
 #include "render/render_world.h"
 
 #include <cstdint>
+#include <array>
 #include <span>
+#include <string>
 #include <vector>
 
 namespace gpu {
+
+struct FrameInstanceBuffer {
+    BufferAllocation allocation{};
+    VkDeviceSize capacity_bytes = 0;
+    VkDeviceSize uploaded_bytes = 0;
+    std::uint64_t reallocation_count = 0;
+};
 
 class GpuResources {
 public:
@@ -26,12 +35,14 @@ public:
     );
 
     void upload_instance_data(std::span<const InstanceData> instances);
+    bool upload_instance_data_for_frame(std::size_t frame_index, std::string & diagnostic);
     void upload_fog_mask(std::span<const std::uint8_t> fog_mask, std::uint32_t width, std::uint32_t height);
     void upload_scene_atlas(const LoadedImage & image);
 
     const BufferAllocation & static_quad_vertex_buffer() const { return static_quad_vertex_buffer_; }
     const BufferAllocation & static_quad_index_buffer() const { return static_quad_index_buffer_; }
-    const BufferAllocation & instance_buffer() const { return instance_buffer_; }
+    const BufferAllocation & instance_buffer(std::size_t frame_index) const { return frame_instance_buffers_.at(frame_index).allocation; }
+    const FrameInstanceBuffer & frame_instance_buffer(std::size_t frame_index) const { return frame_instance_buffers_.at(frame_index); }
     const TextureAllocation & fog_texture() const { return fog_texture_; }
     const TextureAllocation & scene_atlas_texture() const { return scene_atlas_texture_; }
     const TextureAllocation & font_atlas_texture() const { return font_atlas_texture_; }
@@ -45,7 +56,7 @@ private:
     VkCommandPool upload_command_pool_ = VK_NULL_HANDLE;
     BufferAllocation static_quad_vertex_buffer_{};
     BufferAllocation static_quad_index_buffer_{};
-    BufferAllocation instance_buffer_{};
+    std::array<FrameInstanceBuffer, kMaxFramesInFlight> frame_instance_buffers_{};
     TextureAllocation fog_texture_{};
     TextureAllocation scene_atlas_texture_{};
     TextureAllocation font_atlas_texture_{};
@@ -55,7 +66,7 @@ private:
 
     void create_upload_command_pool();
     void create_static_quad_buffers();
-    void ensure_instance_buffer_capacity(VkDeviceSize required_size);
+    bool ensure_instance_buffer_capacity(std::size_t frame_index, VkDeviceSize required_size, std::string & diagnostic);
     void ensure_fog_texture(std::uint32_t width, std::uint32_t height);
     void ensure_scene_atlas_texture(std::uint32_t width, std::uint32_t height);
     void destroy_buffer(BufferAllocation & allocation);

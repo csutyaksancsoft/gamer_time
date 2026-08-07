@@ -4,8 +4,12 @@ layout(push_constant) uniform ScenePushConstants {
     vec2 cameraCenter;
     vec2 viewportSize;
     vec2 atlasGrid;
+    vec2 atlasTextureSize;
+    vec2 atlasTileSize;
     vec2 fogSize;
     float zoom;
+    uint solidTerrainDebug;
+    uint fogEnabled;
 } scene;
 
 layout(set = 0, binding = 0) uniform sampler2D uSceneAtlas;
@@ -33,6 +37,11 @@ void main() {
     vec3 color = atlasColor.rgb;
     float alpha = atlasColor.a * clamp(vOpacity, 0.0, 1.0);
 
+    if (scene.solidTerrainDebug != 0u && (vFlags & 8u) != 0u) {
+        color = fallback_color(vSpriteIndex);
+        alpha = clamp(vOpacity, 0.0, 1.0);
+    }
+
     if ((vFlags & 2u) != 0u) {
         color = vec3(1.0, 0.2, 0.2);
         alpha = clamp(vOpacity, 0.0, 1.0);
@@ -43,7 +52,7 @@ void main() {
         color = mix(color, vec3(1.0, 0.9, 0.2), 0.35 * highlight);
     }
 
-    if ((vFlags & 4u) == 0u) {
+    if (scene.fogEnabled != 0u && (vFlags & 4u) == 0u) {
         vec2 fogUv = clamp(
             (vWorldPos + scene.fogSize * 0.5) / max(scene.fogSize, vec2(1.0)),
             vec2(0.0),

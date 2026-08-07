@@ -4,8 +4,12 @@ layout(push_constant) uniform ScenePushConstants {
     vec2 cameraCenter;
     vec2 viewportSize;
     vec2 atlasGrid;
+    vec2 atlasTextureSize;
+    vec2 atlasTileSize;
     vec2 fogSize;
     float zoom;
+    uint solidTerrainDebug;
+    uint fogEnabled;
 } scene;
 
 layout(location = 0) in vec2 inQuadPos;
@@ -52,5 +56,8 @@ void main() {
     float tileX = float(inSpriteIndex % atlasColumns);
     float tileRowFromTop = float(inSpriteIndex / atlasColumns);
     float tileY = tileRowFromTop;
-    vAtlasUv = (vec2(tileX, tileY) + tileUv) / atlasGrid;
+    vec2 tileOrigin = vec2(tileX, tileY) * scene.atlasTileSize;
+    vec2 uvMin = (tileOrigin + vec2(0.5)) / scene.atlasTextureSize;
+    vec2 uvMax = (tileOrigin + scene.atlasTileSize - vec2(0.5)) / scene.atlasTextureSize;
+    vAtlasUv = mix(uvMin, uvMax, tileUv);
 }

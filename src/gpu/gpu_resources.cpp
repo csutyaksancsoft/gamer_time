@@ -1,13 +1,27 @@
 #include "gpu/gpu_resources.h"
+#include "render/render_safety.h"
 
 #include <array>
 #include <cstring>
+#include <cstdlib>
+#include <sstream>
+#include <limits>
 
 namespace gpu {
 
 namespace {
 
 constexpr VkDeviceSize kMinimumInstanceBufferBytes = sizeof(InstanceData) * 16;
+constexpr std::size_t kMaximumInstances = 1'000'000;
+
+std::size_t maximum_instances() {
+    const char * value = std::getenv("GT_MAX_INSTANCES");
+    if (value == nullptr || *value == '\0') return kMaximumInstances;
+    char * end = nullptr;
+    const unsigned long long parsed = std::strtoull(value, &end, 10);
+    return end != value && *end == '\0' && parsed > 0 && parsed <= std::numeric_limits<std::size_t>::max()
+        ? static_cast<std::size_t>(parsed) : kMaximumInstances;
+}
 
 }
 
@@ -16,13 +30,16 @@ void GpuResources::initialize(VulkanContext & context) {
     context_ = &context;
     create_upload_command_pool();
     create_static_quad_buffers();
-    ensure_instance_buffer_capacity(kMinimumInstanceBufferBytes);
+    for (std::size_t i = 0; i < frame_instance_buffers_.size(); ++i) {
+        std::string diagnostic;
+        if (!ensure_instance_buffer_capacity(i, kMinimumInstanceBufferBytes, diagnostic)) fail(diagnostic);
+    }
 }
 
 void GpuResources::shutdown() {
     if (context_ != nullptr && device() != VK_NULL_HANDLE) {
         vkDeviceWaitIdle(device());
-        destroy_buffer(instance_buffer_);
+        for (FrameInstanceBuffer & frame : frame_instance_buffers_) destroy_buffer(frame.allocation);
         destroy_buffer(static_quad_index_buffer_);
         destroy_buffer(static_quad_vertex_buffer_);
         destroy_texture(fog_texture_);
@@ -41,7 +58,7 @@ void GpuResources::reset() {
     upload_command_pool_ = VK_NULL_HANDLE;
     static_quad_vertex_buffer_ = {};
     static_quad_index_buffer_ = {};
-    instance_buffer_ = {};
+    frame_instance_buffers_ = {};
     fog_texture_ = {};
     scene_atlas_texture_ = {};
     font_atlas_texture_ = {};
@@ -65,21 +82,47 @@ void GpuResources::bind_text_overlay_resources(
 
 void GpuResources::upload_instance_data(std::span<const InstanceData> instances) {
     staged_instances_.assign(instances.begin(), instances.end());
+}
 
-    const VkDeviceSize required_size = staged_instances_.empty()
-        ? kMinimumInstanceBufferBytes
-        : static_cast<VkDeviceSize>(staged_instances_.size() * sizeof(InstanceData));
-    ensure_instance_buffer_capacity(required_size);
-    instance_buffer_.size_bytes = required_size;
+bool GpuResources::upload_instance_data_for_frame(std::size_t frame_index, std::string & diagnostic) {
+    if (frame_index >= frame_instance_buffers_.size()) {
+        diagnostic = "Invalid frame instance-buffer index " + std::to_string(frame_index);
+        return false;
+    }
+    const std::size_t instance_ceiling = maximum_instances();
+    if (staged_instances_.size() > instance_ceiling) {
+        diagnostic = "Instance ceiling exceeded: frame=" + std::to_string(frame_index) +
+            " instances=" + std::to_string(staged_instances_.size()) + " ceiling=" + std::to_string(instance_ceiling);
+        return false;
+    }
+
+    std::uint64_t byte_count = 0;
+    if (!render_safety::checked_instance_bytes(staged_instances_.size(), sizeof(InstanceData), byte_count)) {
+        diagnostic = "Instance upload byte-count overflow: frame=" + std::to_string(frame_index) +
+            " instances=" + std::to_string(staged_instances_.size());
+        return false;
+    }
+    const VkDeviceSize required_size = static_cast<VkDeviceSize>(byte_count);
+    if (!ensure_instance_buffer_capacity(frame_index, required_size, diagnostic)) return false;
+    FrameInstanceBuffer & frame = frame_instance_buffers_[frame_index];
+    frame.uploaded_bytes = required_size;
 
     if (staged_instances_.empty()) {
-        return;
+        return true;
     }
 
     void * mapped_data = nullptr;
-    check_vk(vkMapMemory(device(), instance_buffer_.memory, 0, required_size, 0, &mapped_data), "Failed to map instance buffer");
+    const VkResult map_result = vkMapMemory(device(), frame.allocation.memory, 0, required_size, 0, &mapped_data);
+    if (map_result != VK_SUCCESS) {
+        std::ostringstream out;
+        out << "Failed to map instance buffer: requested=" << required_size << " capacity=" << frame.capacity_bytes
+            << " frame=" << frame_index << " instances=" << staged_instances_.size() << " VkResult=" << map_result;
+        diagnostic = out.str();
+        return false;
+    }
     std::memcpy(mapped_data, staged_instances_.data(), static_cast<size_t>(required_size));
-    vkUnmapMemory(device(), instance_buffer_.memory);
+    vkUnmapMemory(device(), frame.allocation.memory);
+    return true;
 }
 
 void GpuResources::upload_fog_mask(std::span<const std::uint8_t> fog_mask, std::uint32_t width, std::uint32_t height) {
@@ -181,17 +224,26 @@ void GpuResources::create_static_quad_buffers() {
     vkUnmapMemory(device(), static_quad_index_buffer_.memory);
 }
 
-void GpuResources::ensure_instance_buffer_capacity(VkDeviceSize required_size) {
-    if (instance_buffer_.handle != VK_NULL_HANDLE && instance_buffer_.size_bytes >= required_size) {
-        return;
+bool GpuResources::ensure_instance_buffer_capacity(std::size_t frame_index, VkDeviceSize required_size, std::string & diagnostic) {
+    FrameInstanceBuffer & frame = frame_instance_buffers_[frame_index];
+    if (frame.allocation.handle != VK_NULL_HANDLE && frame.capacity_bytes >= required_size) {
+        return true;
     }
-
-    destroy_buffer(instance_buffer_);
-    instance_buffer_ = create_buffer(
-        required_size,
+    std::uint64_t capacity = 0;
+    if (!render_safety::next_power_of_two(required_size, kMinimumInstanceBufferBytes, capacity)) {
+        diagnostic = "Instance buffer capacity overflow: requested=" + std::to_string(required_size) +
+            " current=" + std::to_string(frame.capacity_bytes) + " frame=" + std::to_string(frame_index);
+        return false;
+    }
+    destroy_buffer(frame.allocation);
+    frame.allocation = create_buffer(
+        capacity,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
     );
+    frame.capacity_bytes = capacity;
+    ++frame.reallocation_count;
+    return true;
 }
 
 void GpuResources::ensure_fog_texture(std::uint32_t width, std::uint32_t height) {

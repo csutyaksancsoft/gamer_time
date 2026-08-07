@@ -1,7 +1,9 @@
 #include "render/scene_renderer.h"
+#include "render/render_safety.h"
 
 #include <array>
 #include <fstream>
+#include <iostream>
 
 namespace {
 
@@ -12,8 +14,12 @@ struct ScenePushConstants {
     float camera_center[2];
     float viewport_size[2];
     float atlas_grid[2];
+    float atlas_texture_size[2];
+    float atlas_tile_size[2];
     float fog_size[2];
     float zoom;
+    std::uint32_t solid_terrain_debug;
+    std::uint32_t fog_enabled;
 };
 
 } // namespace
@@ -97,6 +103,10 @@ void SceneRenderer::set_overlay_text(std::string text) {
     text_overlay_.set_text(std::move(text));
 }
 
+Vec2f SceneRenderer::snapped_camera_position() const {
+    return render_safety::snap_camera(camera_.world_center, camera_.zoom);
+}
+
 void SceneRenderer::initialize_scene_atlas(const AtlasAsset & atlas, const LoadedImage & image) {
     if (!atlas.is_valid()) {
         fail("Scene atlas metadata is invalid");
@@ -139,6 +149,12 @@ void SceneRenderer::draw_frame() {
 
     uint32_t image_index = 0;
     check_vk(vkWaitForFences(context_.device(), 1, &in_flight_fences_[current_frame_], VK_TRUE, UINT64_MAX), "Failed to wait for in-flight fence");
+    frame_diagnostic_.clear();
+    frame_upload_valid_ = resources_.upload_instance_data_for_frame(current_frame_, frame_diagnostic_);
+    if (!frame_upload_valid_) {
+        batch_ = {};
+        std::cerr << frame_diagnostic_ << '\n';
+    }
 
     const VkResult acquire_result = vkAcquireNextImageKHR(
         context_.device(),
@@ -595,7 +611,7 @@ void SceneRenderer::record_command_buffer(VkCommandBuffer command_buffer, uint32
     vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline_);
     const VkBuffer vertex_buffers[] = {
         resources_.static_quad_vertex_buffer().handle,
-        resources_.instance_buffer().handle,
+        resources_.instance_buffer(current_frame_).handle,
     };
     const VkDeviceSize offsets[] = {0, 0};
     vkCmdBindDescriptorSets(
@@ -613,15 +629,23 @@ void SceneRenderer::record_command_buffer(VkCommandBuffer command_buffer, uint32
 
     const gpu::TextureAllocation & fog = resources_.fog_texture();
     ScenePushConstants push_constants{};
-    push_constants.camera_center[0] = camera_.world_center.x;
-    push_constants.camera_center[1] = camera_.world_center.y;
+    const Vec2f snapped_camera = snapped_camera_position();
+    push_constants.camera_center[0] = snapped_camera.x;
+    push_constants.camera_center[1] = snapped_camera.y;
     push_constants.viewport_size[0] = static_cast<float>(swapchain_.extent().width);
     push_constants.viewport_size[1] = static_cast<float>(swapchain_.extent().height);
     push_constants.atlas_grid[0] = static_cast<float>(scene_atlas_.columns);
     push_constants.atlas_grid[1] = static_cast<float>(scene_atlas_.rows);
+    const gpu::TextureAllocation & atlas = resources_.scene_atlas_texture();
+    push_constants.atlas_texture_size[0] = static_cast<float>(atlas.width);
+    push_constants.atlas_texture_size[1] = static_cast<float>(atlas.height);
+    push_constants.atlas_tile_size[0] = static_cast<float>(scene_atlas_.tile_width);
+    push_constants.atlas_tile_size[1] = static_cast<float>(scene_atlas_.tile_height);
     push_constants.fog_size[0] = static_cast<float>(fog.width) * kFogCellWorldWidth;
     push_constants.fog_size[1] = static_cast<float>(fog.height) * kFogCellWorldHeight;
     push_constants.zoom = camera_.zoom;
+    push_constants.solid_terrain_debug = solid_terrain_debug_ ? 1u : 0u;
+    push_constants.fog_enabled = fog_enabled_ ? 1u : 0u;
     vkCmdPushConstants(
         command_buffer,
         pipeline_layout_,
@@ -635,12 +659,16 @@ void SceneRenderer::record_command_buffer(VkCommandBuffer command_buffer, uint32
         if (range.instance_count == 0) {
             continue;
         }
+        if (!render_safety::valid_draw_range(range.instance_offset, range.instance_count, batch_.instances.size())) {
+            std::cerr << "Skipping invalid terrain draw range offset=" << range.instance_offset << " count=" << range.instance_count << " total=" << batch_.instances.size() << '\n';
+            continue;
+        }
         vkCmdDrawIndexed(command_buffer, 6, range.instance_count, 0, 0, static_cast<int32_t>(range.instance_offset));
     }
-    if (batch_.unit_instance_count > 0) {
+    if (batch_.unit_instance_count > 0 && render_safety::valid_draw_range(batch_.unit_instance_offset, batch_.unit_instance_count, batch_.instances.size())) {
         vkCmdDrawIndexed(command_buffer, 6, batch_.unit_instance_count, 0, 0, static_cast<int32_t>(batch_.unit_instance_offset));
     }
-    if (batch_.debug_instance_count > 0) {
+    if (batch_.debug_instance_count > 0 && render_safety::valid_draw_range(batch_.debug_instance_offset, batch_.debug_instance_count, batch_.instances.size())) {
         vkCmdDrawIndexed(command_buffer, 6, batch_.debug_instance_count, 0, 0, static_cast<int32_t>(batch_.debug_instance_offset));
     }
 

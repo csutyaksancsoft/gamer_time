@@ -1,12 +1,11 @@
 #include "platform/camera_controller.h"
+#include "render/render_safety.h"
 
 #include <algorithm>
 
 void CameraController::update(const InputState & input, float dt_seconds) {
-    constexpr float kZoomStep = 0.12f;
-    constexpr float kMinZoom = 0.35f;
-    constexpr float kMaxZoom = 3.0f;
-
     (void)dt_seconds;
-    state_.zoom = std::clamp(state_.zoom + input.wheel_delta * kZoomStep, kMinZoom, kMaxZoom);
+    if (input.wheel_delta != 0.0f) {
+        state_.zoom = render_safety::select_zoom_level(state_.zoom, input.wheel_delta);
+    }
 }

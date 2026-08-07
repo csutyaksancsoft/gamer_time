@@ -23,6 +23,7 @@ public:
 
     void request_resize();
     void set_overlay_text(std::string text);
+    void set_debug_modes(bool solid_terrain, bool fog_enabled) { solid_terrain_debug_ = solid_terrain; fog_enabled_ = fog_enabled; }
     void initialize_scene_atlas(const AtlasAsset & atlas, const LoadedImage & image);
     void upload_frame_resources(
         const RenderBatch & batch,
@@ -35,6 +36,10 @@ public:
     void wait_idle();
 
     const gpu::GpuResources & resources() const { return resources_; }
+    std::size_t current_frame_index() const { return current_frame_; }
+    Vec2f snapped_camera_position() const;
+    const std::string & frame_diagnostic() const { return frame_diagnostic_; }
+    const RenderBatch & staged_batch() const { return batch_; }
 
 private:
     SDL_Window * window_ = nullptr;
@@ -63,6 +68,10 @@ private:
     std::vector<VkFence> in_flight_fences_;
     size_t current_frame_ = 0;
     bool initialized_ = false;
+    bool solid_terrain_debug_ = false;
+    bool fog_enabled_ = true;
+    bool frame_upload_valid_ = true;
+    std::string frame_diagnostic_;
 
     void create_render_pass();
     void create_scene_descriptor_set_layout();
