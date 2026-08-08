@@ -14,6 +14,8 @@ layout(push_constant) uniform ScenePushConstants {
 
 layout(set = 0, binding = 0) uniform sampler2D uSceneAtlas;
 layout(set = 0, binding = 1) uniform sampler2D uFogMask;
+layout(set = 0, binding = 2) uniform sampler2D uMenuImage;
+layout(set = 0, binding = 3) uniform sampler2D uScoreboardImage;
 
 layout(location = 0) in vec2 vUv;
 layout(location = 1) in vec2 vWorldPos;
@@ -35,6 +37,8 @@ vec3 fallback_color(uint spriteIndex) {
 
 void main() {
     vec4 atlasColor = texture(uSceneAtlas, vAtlasUv);
+    if((vFlags&128u)!=0u)atlasColor=texture(uMenuImage,vUv);
+    if((vFlags&256u)!=0u)atlasColor=texture(uScoreboardImage,vUv);
     vec3 color = atlasColor.rgb;
     float alpha = atlasColor.a * clamp(vOpacity, 0.0, 1.0);
 

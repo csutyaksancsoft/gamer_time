@@ -38,6 +38,8 @@ public:
     bool upload_instance_data_for_frame(std::size_t frame_index, std::string & diagnostic);
     void upload_fog_mask(std::span<const std::uint8_t> fog_mask, std::uint32_t width, std::uint32_t height);
     void upload_scene_atlas(const LoadedImage & image);
+    void upload_menu_image(const LoadedImage & image);
+    void upload_scoreboard_image(const LoadedImage & image);
 
     const BufferAllocation & static_quad_vertex_buffer() const { return static_quad_vertex_buffer_; }
     const BufferAllocation & static_quad_index_buffer() const { return static_quad_index_buffer_; }
@@ -45,6 +47,8 @@ public:
     const FrameInstanceBuffer & frame_instance_buffer(std::size_t frame_index) const { return frame_instance_buffers_.at(frame_index); }
     const TextureAllocation & fog_texture() const { return fog_texture_; }
     const TextureAllocation & scene_atlas_texture() const { return scene_atlas_texture_; }
+    const TextureAllocation & menu_texture() const { return menu_texture_; }
+    const TextureAllocation & scoreboard_texture() const { return scoreboard_texture_; }
     const TextureAllocation & font_atlas_texture() const { return font_atlas_texture_; }
     VkBuffer text_vertex_buffer() const { return text_vertex_buffer_; }
 
@@ -59,6 +63,8 @@ private:
     std::array<FrameInstanceBuffer, kMaxFramesInFlight> frame_instance_buffers_{};
     TextureAllocation fog_texture_{};
     TextureAllocation scene_atlas_texture_{};
+    TextureAllocation menu_texture_{};
+    TextureAllocation scoreboard_texture_{};
     TextureAllocation font_atlas_texture_{};
     VkBuffer text_vertex_buffer_ = VK_NULL_HANDLE;
     std::vector<InstanceData> staged_instances_;
@@ -69,6 +75,8 @@ private:
     bool ensure_instance_buffer_capacity(std::size_t frame_index, VkDeviceSize required_size, std::string & diagnostic);
     void ensure_fog_texture(std::uint32_t width, std::uint32_t height);
     void ensure_scene_atlas_texture(std::uint32_t width, std::uint32_t height);
+    void upload_ui_texture(TextureAllocation & texture, const LoadedImage & image);
+    void ensure_ui_texture(TextureAllocation & texture, std::uint32_t width, std::uint32_t height);
     void destroy_buffer(BufferAllocation & allocation);
     void destroy_texture(TextureAllocation & allocation);
     uint32_t find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties) const;

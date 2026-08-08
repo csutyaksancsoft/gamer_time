@@ -14,9 +14,10 @@ namespace ui {
 struct Rect { float x=0,y=0,width=0,height=0; bool contains(float px,float py) const{return px>=x&&py>=y&&px<x+width&&py<y+height;} };
 struct Color { float r=1,g=1,b=1,a=1; };
 enum class Align : std::uint8_t { left, center, right };
-struct ScreenQuad { Rect bounds{}; std::uint16_t sprite=0; Color color{}; bool use_atlas=true; };
+enum class Image : std::uint8_t { none, menu, scoreboard };
+struct ScreenQuad { Rect bounds{}; std::uint16_t sprite=0; Color color{}; bool use_atlas=true; Image image=Image::none; };
 struct TextRun { std::string text; Rect bounds{}; float scale=1; Color color{}; Align alignment=Align::left; bool clip=true; };
-enum class Action : std::uint8_t { none, connect, vote_teams, vote_ffa, team_red, team_blue, team_green, team_gold };
+enum class Action : std::uint8_t { none, focus_name, focus_server, connect, vote_teams, vote_ffa, team_red, team_blue, team_green, team_gold };
 struct HitRegion { Rect bounds{}; Action action=Action::none; bool enabled=true; };
 struct DrawList { std::vector<ScreenQuad> quads; std::vector<TextRun> text; std::vector<HitRegion> hits; void clear(){quads.clear();text.clear();hits.clear();} };
 

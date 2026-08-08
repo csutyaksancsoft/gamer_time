@@ -85,8 +85,15 @@ InputState SdlPlatform::poll_input() {
             }
             if (event.key.key == SDLK_F4) input.toggle_terrain_debug_pressed = true;
             if (event.key.key == SDLK_F5) input.toggle_text_pressed = true;
+            if (event.key.key == SDLK_F6) input.toggle_ui_debug_pressed = true;
             if (event.key.key == SDLK_RETURN || event.key.key == SDLK_KP_ENTER) input.enter_pressed = true;
             if (event.key.key == SDLK_BACKSPACE) input.backspace_pressed = true;
+            if (event.key.key == SDLK_DELETE) input.delete_pressed = true;
+            if (event.key.key == SDLK_LEFT) input.left_pressed = true;
+            if (event.key.key == SDLK_RIGHT) input.right_pressed = true;
+            if (event.key.key == SDLK_HOME) input.home_pressed = true;
+            if (event.key.key == SDLK_END) input.end_pressed = true;
+            if (event.key.key == SDLK_TAB && !event.key.repeat) input.tab_pressed = true;
             if (event.key.key == SDLK_A || event.key.key == SDLK_LEFT) {
                 input.move_left = true;
             }

@@ -2,6 +2,7 @@
 #include "render/render_safety.h"
 
 #include <array>
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 
@@ -103,6 +104,16 @@ void SceneRenderer::set_overlay_text(std::string text) {
     text_overlay_.set_text(std::move(text));
 }
 
+void SceneRenderer::set_ui_draw_list(ui::DrawList list) {
+    if(!list.quads.empty()){
+        const bool menu=std::any_of(list.hits.begin(),list.hits.end(),[](const auto&hit){return hit.action==ui::Action::focus_name;});
+        const bool scoreboard=!list.text.empty()&&list.text.front().text.find("SCOREBOARD")!=std::string::npos;
+        if(menu)list.quads.front().image=ui::Image::menu;else if(scoreboard)list.quads.front().image=ui::Image::scoreboard;
+    }
+    ui_draw_list_ = std::move(list);
+    text_overlay_.set_runs(ui_draw_list_.text);
+}
+
 Vec2f SceneRenderer::snapped_camera_position() const {
     return render_safety::snap_camera(camera_.world_center, camera_.zoom);
 }
@@ -125,6 +136,8 @@ void SceneRenderer::initialize_scene_atlas(const AtlasAsset & atlas, const Loade
     update_scene_descriptor_set();
 }
 
+void SceneRenderer::initialize_ui_images(const LoadedImage & menu,const LoadedImage & scoreboard){resources_.upload_menu_image(menu);resources_.upload_scoreboard_image(scoreboard);update_scene_descriptor_set();}
+
 void SceneRenderer::upload_frame_resources(
     const RenderBatch & batch,
     std::span<const std::uint8_t> fog_mask,
@@ -133,7 +146,25 @@ void SceneRenderer::upload_frame_resources(
     const CameraState & camera
 ) {
     batch_ = batch;
-    resources_.upload_instance_data(batch.instances);
+    if(!ui_draw_list_.quads.empty()&&batch_.debug_instance_count==0)batch_.debug_instance_offset=static_cast<std::uint32_t>(batch_.instances.size());
+    for (const auto & quad : ui_draw_list_.quads) {
+        InstanceData instance{};
+        // UI layout and mouse input use a top-left origin. The existing screen-space
+        // scene pipeline uses a bottom-left origin for the rhythm HUD, so convert
+        // only UI quads here instead of changing the shader for every screen quad.
+        const float ui_center_y=quad.bounds.y+quad.bounds.height*0.5f;
+        instance.world_pos = {quad.bounds.x + quad.bounds.width * 0.5f, static_cast<float>(swapchain_.extent().height)-ui_center_y};
+        instance.size = {quad.bounds.width, quad.bounds.height};
+        instance.sprite_index = quad.sprite;
+        instance.flags = kInstanceFlagScreenSpace | kInstanceFlagIgnoreFog;
+        if (!quad.use_atlas) instance.flags |= kInstanceFlagSolidColor;
+        if(quad.image==ui::Image::menu){instance.flags&=~kInstanceFlagSolidColor;instance.flags|=kInstanceFlagMenuImage;}
+        if(quad.image==ui::Image::scoreboard){instance.flags&=~kInstanceFlagSolidColor;instance.flags|=kInstanceFlagScoreboardImage;}
+        instance.color[0]=quad.color.r;instance.color[1]=quad.color.g;instance.color[2]=quad.color.b;instance.color[3]=quad.color.a;
+        batch_.instances.push_back(instance);
+        ++batch_.debug_instance_count;
+    }
+    resources_.upload_instance_data(batch_.instances);
     resources_.upload_fog_mask(fog_mask, fog_width, fog_height);
     camera_ = camera;
     update_scene_descriptor_set();
@@ -260,7 +291,7 @@ void SceneRenderer::create_render_pass() {
 }
 
 void SceneRenderer::create_scene_descriptor_set_layout() {
-    std::array<VkDescriptorSetLayoutBinding, 2> bindings{};
+    std::array<VkDescriptorSetLayoutBinding, 4> bindings{};
     bindings[0].binding = 0;
     bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     bindings[0].descriptorCount = 1;
@@ -269,6 +300,7 @@ void SceneRenderer::create_scene_descriptor_set_layout() {
     bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     bindings[1].descriptorCount = 1;
     bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    for(std::uint32_t i=2;i<4;++i){bindings[i].binding=i;bindings[i].descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;bindings[i].descriptorCount=1;bindings[i].stageFlags=VK_SHADER_STAGE_FRAGMENT_BIT;}
 
     VkDescriptorSetLayoutCreateInfo layout_info{};
     layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -281,7 +313,7 @@ void SceneRenderer::create_scene_descriptor_set_layout() {
 void SceneRenderer::create_scene_descriptor_resources() {
     VkDescriptorPoolSize pool_size{};
     pool_size.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    pool_size.descriptorCount = 2;
+    pool_size.descriptorCount = 4;
 
     VkDescriptorPoolCreateInfo pool_info{};
     pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -307,25 +339,27 @@ void SceneRenderer::update_scene_descriptor_set() {
     }
 
     const gpu::TextureAllocation & fog = resources_.fog_texture();
-    const gpu::TextureAllocation & atlas = resources_.scene_atlas_texture();
+    const gpu::TextureAllocation & atlas = resources_.scene_atlas_texture();const auto&menu=resources_.menu_texture();const auto&scoreboard=resources_.scoreboard_texture();
     if (
         fog.view == VK_NULL_HANDLE ||
         fog.sampler == VK_NULL_HANDLE ||
         atlas.view == VK_NULL_HANDLE ||
-        atlas.sampler == VK_NULL_HANDLE
+        atlas.sampler == VK_NULL_HANDLE || menu.sampler==VK_NULL_HANDLE || scoreboard.sampler==VK_NULL_HANDLE
     ) {
         return;
     }
 
-    std::array<VkDescriptorImageInfo, 2> image_infos{};
+    std::array<VkDescriptorImageInfo, 4> image_infos{};
     image_infos[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     image_infos[0].imageView = atlas.view;
     image_infos[0].sampler = atlas.sampler;
     image_infos[1].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     image_infos[1].imageView = fog.view;
     image_infos[1].sampler = fog.sampler;
+    image_infos[2]={menu.sampler,menu.view,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+    image_infos[3]={scoreboard.sampler,scoreboard.view,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
 
-    std::array<VkWriteDescriptorSet, 2> descriptor_writes{};
+    std::array<VkWriteDescriptorSet, 4> descriptor_writes{};
     descriptor_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptor_writes[0].dstSet = scene_descriptor_set_;
     descriptor_writes[0].dstBinding = 0;
@@ -338,6 +372,7 @@ void SceneRenderer::update_scene_descriptor_set() {
     descriptor_writes[1].descriptorCount = 1;
     descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     descriptor_writes[1].pImageInfo = &image_infos[1];
+    for(std::uint32_t i=2;i<4;++i){descriptor_writes[i].sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;descriptor_writes[i].dstSet=scene_descriptor_set_;descriptor_writes[i].dstBinding=i;descriptor_writes[i].descriptorCount=1;descriptor_writes[i].descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;descriptor_writes[i].pImageInfo=&image_infos[i];}
 
     vkUpdateDescriptorSets(context_.device(), static_cast<uint32_t>(descriptor_writes.size()), descriptor_writes.data(), 0, nullptr);
 }

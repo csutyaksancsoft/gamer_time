@@ -3,6 +3,7 @@
 #include "gpu/gpu_resources.h"
 #include "gpu/swapchain_manager.h"
 #include "gpu/vulkan_context.h"
+#include "ui/ui_model.h"
 
 #include <string>
 #include <vector>
@@ -19,6 +20,7 @@ public:
     void shutdown();
     void on_render_pass_changed(VkRenderPass render_pass);
     void set_text(std::string text);
+    void set_runs(std::vector<ui::TextRun> runs);
     void prepare_frame();
     void record(VkCommandBuffer command_buffer) const;
 
@@ -37,6 +39,7 @@ private:
     gpu::GpuResources * resources_ = nullptr;
     std::string shader_dir_;
     std::string text_;
+    std::vector<ui::TextRun> runs_;
     bool dirty_ = true;
     VkRenderPass render_pass_ = VK_NULL_HANDLE;
     VkPipelineLayout pipeline_layout_ = VK_NULL_HANDLE;

@@ -40,6 +40,10 @@ private:
     std::string build_overlay_text() const;
     std::string build_menu_text() const;
     std::string build_scoreboard_text() const;
+    ui::DrawList build_menu_ui(int width, int height) const;
+    ui::DrawList build_match_ui(int width, int height, bool scoreboard) const;
+    void append_ui_debug(ui::DrawList & list) const;
+    ui::Action clicked_action(const ui::DrawList & list, const InputState & input) const;
 
     RuntimeConfig config_;
     SdlPlatform platform_;
@@ -79,4 +83,9 @@ private:
     std::string menu_server_;
     std::string menu_error_;
     bool was_connected_ = false;
+    bool ui_debug_visible_ = false;
+    bool menu_connecting_ = false;
+    std::uint64_t menu_connect_started_us_ = 0;
+    std::size_t name_cursor_ = 0;
+    std::size_t server_cursor_ = 0;
 };

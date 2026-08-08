@@ -66,11 +66,18 @@ void TextOverlayRenderer::on_render_pass_changed(VkRenderPass render_pass) {
 }
 
 void TextOverlayRenderer::set_text(std::string text) {
-    if (text_ == text) {
+    if (runs_.empty() && text_ == text) {
         return;
     }
 
     text_ = std::move(text);
+    runs_.clear();
+    dirty_ = true;
+}
+
+void TextOverlayRenderer::set_runs(std::vector<ui::TextRun> runs) {
+    runs_ = std::move(runs);
+    text_.clear();
     dirty_ = true;
 }
 
@@ -99,7 +106,8 @@ void TextOverlayRenderer::prepare_frame() {
     const uint32_t max_lines = std::max(1u, static_cast<uint32_t>(available_height / (glyph_height + line_gap)));
 
     std::vector<TextVertex> vertices;
-    vertices.reserve(std::min(text_.size(), kMaxOverlayGlyphs) * 6);
+    std::size_t requested_glyphs=text_.size();for(const auto&r:runs_)requested_glyphs+=r.text.size();
+    vertices.reserve(std::min(requested_glyphs, kMaxOverlayGlyphs) * 6);
 
     auto push_glyph = [&](float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1) {
         vertices.push_back({{x0, y0}, {u0, v0}});
@@ -116,6 +124,22 @@ void TextOverlayRenderer::prepare_frame() {
     auto to_ndc_y = [&](float pixel_y) {
         return 1.0f - (pixel_y / static_cast<float>(extent.height)) * 2.0f;
     };
+
+    if(!runs_.empty()) {
+        for(const auto & run:runs_) {
+            const float scale=std::max(0.25f,run.scale),gw=kDebugFontCharacterSize*scale,gh=kDebugFontCharacterSize*scale;
+            float y=run.bounds.y;
+            std::size_t start=0;
+            while(start<=run.text.size()&&vertices.size()<text_vertex_capacity_) {
+                const auto end=run.text.find('\n',start);const std::string_view line(run.text.data()+start,(end==std::string::npos?run.text.size():end)-start);
+                const float line_width=line.size()*gw;float x=run.bounds.x;if(run.alignment==ui::Align::center)x+=(run.bounds.width-line_width)*0.5f;else if(run.alignment==ui::Align::right)x+=run.bounds.width-line_width;
+                for(unsigned char c:line){if(run.clip&&(x+gw>run.bounds.x+run.bounds.width||y+gh>run.bounds.y+run.bounds.height))break;bool blank=false;const auto glyph=glyph_index_for_byte(c,blank);if(!blank){const auto ac=glyph%kTextAtlasGlyphsPerRow,ar=glyph/kTextAtlasGlyphsPerRow;const float aw=float((kDebugFontCharacterSize+kDebugFontGlyphPadding)*kTextAtlasGlyphsPerRow),ah=float(((SDL_DEBUG_FONT_NUM_GLYPHS/kTextAtlasGlyphsPerRow)+1)*(kDebugFontCharacterSize+kDebugFontGlyphPadding));const float ax=float(ac*(kDebugFontCharacterSize+kDebugFontGlyphPadding)+1),ay=float(ar*(kDebugFontCharacterSize+kDebugFontGlyphPadding)+1);push_glyph(to_ndc_x(x),to_ndc_y(y),to_ndc_x(x+gw),to_ndc_y(y+gh),ax/aw,(ay+kDebugFontCharacterSize)/ah,(ax+kDebugFontCharacterSize)/aw,ay/ah);}x+=gw;}
+                y+=gh+4*scale;if(end==std::string::npos)break;start=end+1;
+            }
+        }
+        text_vertex_count_=static_cast<uint32_t>(vertices.size());
+        if(text_vertex_count_>0){void*mapped=nullptr;const VkDeviceSize size=vertices.size()*sizeof(TextVertex);check_vk(vkMapMemory(device(),text_vertex_buffer_memory_,0,size,0,&mapped),"Failed to map text vertex buffer");std::memcpy(mapped,vertices.data(),static_cast<size_t>(size));vkUnmapMemory(device(),text_vertex_buffer_memory_);}dirty_=false;return;
+    }
 
     uint32_t column = 0;
     uint32_t line = 0;

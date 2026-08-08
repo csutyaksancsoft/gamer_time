@@ -25,10 +25,11 @@ public:
 
     void request_resize();
     void set_overlay_text(std::string text);
-    void set_ui_draw_list(ui::DrawList list) { ui_draw_list_ = std::move(list); }
+    void set_ui_draw_list(ui::DrawList list);
     const ui::DrawList & ui_draw_list() const { return ui_draw_list_; }
     void set_debug_modes(bool solid_terrain, bool fog_enabled) { solid_terrain_debug_ = solid_terrain; fog_enabled_ = fog_enabled; }
     void initialize_scene_atlas(const AtlasAsset & atlas, const LoadedImage & image);
+    void initialize_ui_images(const LoadedImage & menu, const LoadedImage & scoreboard);
     void upload_frame_resources(
         const RenderBatch & batch,
         std::span<const std::uint8_t> fog_mask,

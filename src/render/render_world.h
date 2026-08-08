@@ -15,6 +15,8 @@ constexpr std::uint32_t kInstanceFlagTerrain = 1u << 3;
 constexpr std::uint32_t kInstanceFlagScreenSpace = 1u << 4;
 constexpr std::uint32_t kInstanceFlagSolidColor = 1u << 5;
 constexpr std::uint32_t kInstanceFlagCircleOutline = 1u << 6;
+constexpr std::uint32_t kInstanceFlagMenuImage = 1u << 7;
+constexpr std::uint32_t kInstanceFlagScoreboardImage = 1u << 8;
 
 struct RenderUnit {
     UnitId id = 0;
