@@ -287,14 +287,6 @@ MapWorld MapWorld::from_tmx(const TmxMapAsset & map_asset) {
                 object.polygon = to_map_polygon(source_object.polygon, object.position);
             }
 
-            if (layer.name == "collision" && object.has_polygon) {
-                CollisionPolygon collision{};
-                collision.source_object_id = object.id;
-                collision.source_layer_name = layer.name;
-                collision.points = object.polygon.points;
-                map.collision_polygons_.push_back(collision);
-            }
-
             layer.objects.push_back(std::move(object));
         }
 

@@ -98,12 +98,6 @@ struct ObjectLayer {
     std::string_view property_value(std::string_view name) const;
 };
 
-struct CollisionPolygon {
-    std::uint32_t source_object_id = 0;
-    std::string source_layer_name;
-    std::vector<Vec2f> points;
-};
-
 class MapWorld {
 public:
     MapWorld() = default;
@@ -119,7 +113,6 @@ public:
     const std::vector<MapProperty> & properties() const { return properties_; }
     const std::vector<TileLayer> & tile_layers() const { return tile_layers_; }
     const std::vector<ObjectLayer> & object_layers() const { return object_layers_; }
-    const std::vector<CollisionPolygon> & collision_polygons() const { return collision_polygons_; }
     const std::vector<MapAnimation> & animations() const { return animations_; }
     std::uint32_t resolve_animated_index(std::uint32_t atlas_index, std::uint64_t time_ms) const;
 
@@ -135,6 +128,5 @@ private:
     std::vector<MapProperty> properties_;
     std::vector<TileLayer> tile_layers_;
     std::vector<ObjectLayer> object_layers_;
-    std::vector<CollisionPolygon> collision_polygons_;
     std::vector<MapAnimation> animations_;
 };

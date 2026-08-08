@@ -11,7 +11,7 @@
 
 namespace {
 
-constexpr const char * kDefaultMapName = "maps/brawlers_ballad.tmx";
+constexpr const char * kDefaultMapName = "tiled_projects/maps/brawlers_ballad.tmx";
 
 } // namespace
 
@@ -54,7 +54,7 @@ void Application::initialize() {
     scene_atlas_ = std::move(runtime_atlas.atlas);
     scene_atlas_image_ = std::move(runtime_atlas.image);
     player_sprite_base_ = scene_atlas_.tile_count();
-    const LoadedImage placeholder_atlas = assets::load_png_rgba(config_.asset_dir + "/tiles/sample_scene_atlas.png");
+    const LoadedImage placeholder_atlas = assets::load_png_rgba(config_.asset_dir + "/tiled_projects/tiles/shared/sample_scene_atlas.png");
     assets::append_packed_sprites(scene_atlas_image_, placeholder_atlas, 4, scene_atlas_.tile_width, scene_atlas_.columns, player_sprite_base_);
     scene_atlas_.logical_tile_count += 4;
     scene_atlas_.columns = scene_atlas_image_.width / scene_atlas_.tile_width;
@@ -178,7 +178,7 @@ void Application::tick_frame(float dt_seconds) {
     movement = local_alive_?normalize_or_zero(movement):Vec2f{};
     if (have_predicted_position_) {
         const Vec2f candidate = predicted_position_ + movement * (net::kMoveSpeed * dt_seconds);
-        if (!world_.collision().blocks_segment(predicted_position_, candidate)) predicted_position_ = candidate;
+        if (!world_.collision().blocks_segment(CollisionChannel::Player, predicted_position_, candidate)) predicted_position_ = candidate;
         camera_controller_.follow(predicted_position_);
         if (TransformComponent * transform = world_.try_transform(network_.player_id())) transform->position = predicted_position_;
     }

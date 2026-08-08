@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include <string_view>
 
 namespace {
 
@@ -94,27 +93,20 @@ bool segments_intersect(const Vec2f & p, const Vec2f & p2, const Vec2f & q, cons
     return t >= 0.0f && t <= 1.0f && u >= 0.0f && u <= 1.0f;
 }
 
-bool blocks_movement(const ObjectLayer & layer, const MapObject & object) {
-    if (object.property_as_bool("engine.blocks_movement")) {
+bool collision_flags_for_layer(const std::string & name, CollisionShape & shape) {
+    if (name == "collision_full") {
+        shape.blocks_players = shape.blocks_shots = shape.blocks_vision = true;
         return true;
     }
-
-    const std::string_view object_semantic = object.property_value("engine.semantic");
-    if (object_semantic == "collision" || object_semantic == "boundary") {
+    if (name == "collision_shots") {
+        shape.blocks_players = shape.blocks_shots = true;
         return true;
     }
-
-    if (layer.property_as_bool("engine.blocks_movement")) {
+    if (name == "collision_player") {
+        shape.blocks_players = true;
         return true;
     }
-
-    const std::string_view layer_semantic = layer.property_value("engine.semantic");
-    if (layer_semantic == "collision" || layer_semantic == "boundary") {
-        return true;
-    }
-
-    return layer.name == "collision" || object.name == "collision" || object.type == "collision" ||
-           layer.name == "boundary" || object.name == "boundary" || object.type == "boundary";
+    return false;
 }
 
 std::vector<Vec2f> build_collision_points(const MapObject & object) {
@@ -146,11 +138,9 @@ CollisionWorld CollisionWorld::from_map(const MapWorld & map) {
     CollisionWorld collision_world{};
 
     for (const ObjectLayer & layer : map.object_layers()) {
+        CollisionShape channel_template{};
+        if (!collision_flags_for_layer(layer.name, channel_template)) continue;
         for (const MapObject & object : layer.objects) {
-            if (!blocks_movement(layer, object)) {
-                continue;
-            }
-
             std::vector<Vec2f> points = build_collision_points(object);
             if (points.size() < 3) {
                 continue;
@@ -159,6 +149,9 @@ CollisionWorld CollisionWorld::from_map(const MapWorld & map) {
             CollisionShape shape{};
             shape.source_object_id = object.id;
             shape.source_layer_name = layer.name;
+            shape.blocks_players = channel_template.blocks_players;
+            shape.blocks_shots = channel_template.blocks_shots;
+            shape.blocks_vision = channel_template.blocks_vision;
             shape.bounds = compute_bounds(points);
             shape.points = std::move(points);
             collision_world.shapes_.push_back(std::move(shape));
@@ -168,14 +161,23 @@ CollisionWorld CollisionWorld::from_map(const MapWorld & map) {
     return collision_world;
 }
 
-bool CollisionWorld::blocks_segment(std::span<const CollisionShape * const> candidates, const Vec2f & start, const Vec2f & end) const {
+bool CollisionShape::blocks(CollisionChannel channel) const {
+    switch (channel) {
+    case CollisionChannel::Player: return blocks_players;
+    case CollisionChannel::Shot: return blocks_shots;
+    case CollisionChannel::Vision: return blocks_vision;
+    }
+    return false;
+}
+
+bool CollisionWorld::blocks_segment(CollisionChannel channel, std::span<const CollisionShape * const> candidates, const Vec2f & start, const Vec2f & end) const {
     for (const CollisionShape * shape_ptr : candidates) {
         if (!shape_ptr) {
             continue;
         }
 
         const CollisionShape & shape = *shape_ptr;
-        if (!shape.bounds.intersects_segment(start, end) && !point_in_bounds(shape.bounds, end)) {
+        if (!shape.blocks(channel) || (!shape.bounds.intersects_segment(start, end) && !point_in_bounds(shape.bounds, end))) {
             continue;
         }
 
@@ -195,23 +197,23 @@ bool CollisionWorld::blocks_segment(std::span<const CollisionShape * const> cand
     return false;
 }
 
-bool CollisionWorld::blocks_segment(const Vec2f & start, const Vec2f & end) const {
+bool CollisionWorld::blocks_segment(CollisionChannel channel, const Vec2f & start, const Vec2f & end) const {
     std::vector<const CollisionShape *> candidates;
     candidates.reserve(shapes_.size());
     for (const CollisionShape & shape : shapes_) {
         candidates.push_back(&shape);
     }
-    return blocks_segment(candidates, start, end);
+    return blocks_segment(channel, candidates, start, end);
 }
 
-bool CollisionWorld::blocks_point(std::span<const CollisionShape * const> candidates, const Vec2f & point) const {
+bool CollisionWorld::blocks_point(CollisionChannel channel, std::span<const CollisionShape * const> candidates, const Vec2f & point) const {
     for (const CollisionShape * shape_ptr : candidates) {
         if (!shape_ptr) {
             continue;
         }
 
         const CollisionShape & shape = *shape_ptr;
-        if (!point_in_bounds(shape.bounds, point)) {
+        if (!shape.blocks(channel) || !point_in_bounds(shape.bounds, point)) {
             continue;
         }
         if (point_in_polygon(shape.points, point)) {
@@ -222,19 +224,19 @@ bool CollisionWorld::blocks_point(std::span<const CollisionShape * const> candid
     return false;
 }
 
-bool CollisionWorld::blocks_point(const Vec2f & point) const {
+bool CollisionWorld::blocks_point(CollisionChannel channel, const Vec2f & point) const {
     std::vector<const CollisionShape *> candidates;
     candidates.reserve(shapes_.size());
     for (const CollisionShape & shape : shapes_) {
         candidates.push_back(&shape);
     }
-    return blocks_point(candidates, point);
+    return blocks_point(channel, candidates, point);
 }
 
-std::vector<const CollisionShape *> CollisionWorld::query_bounds(const CollisionBounds & bounds) const {
+std::vector<const CollisionShape *> CollisionWorld::query_bounds(CollisionChannel channel, const CollisionBounds & bounds) const {
     std::vector<const CollisionShape *> candidates;
     for (const CollisionShape & shape : shapes_) {
-        if (shape.bounds.intersects(bounds)) {
+        if (shape.blocks(channel) && shape.bounds.intersects(bounds)) {
             candidates.push_back(&shape);
         }
     }

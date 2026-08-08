@@ -28,7 +28,7 @@ int main() {
  <tileset firstgid="1" source="tiles/animated.tsx"/><tileset firstgid="10" source="tiles/second.tsx"/>
  <layer id="1" name="ground" width="2" height="1"><data encoding="csv">2,)" << transformed << R"(</data></layer>
  <objectgroup id="2" name="props" draworder="topdown" opacity="0.5"><object id="7" x="8" y="16" width="32" height="24" rotation="30" gid="2"/></objectgroup>
- <objectgroup id="3" name="collision"><object id="8" x="0" y="0"><polygon points="0,0 16,0 16,16"/></object></objectgroup>
+ <objectgroup id="3" name="collision_full"><object id="8" x="0" y="0"><polygon points="0,0 16,0 16,16"/></object></objectgroup>
 </map>)";
     }
 
@@ -52,6 +52,5 @@ int main() {
     assert(prop.is_tile && prop.atlas_index == 1 && prop.opacity == 0.5f);
     assert(prop.size.x == 32 && prop.size.y == 24 && prop.rotation == 30);
     assert(prop.position.x == 10 && prop.position.y == 1); // centered map origin + anchor/alignment/offset
-    assert(map.collision_polygons().size() == 1);
     std::filesystem::remove_all(root);
 }

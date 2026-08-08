@@ -6,7 +6,7 @@ This project now renders a single scene atlas for both terrain and entities.
 
 Put your atlas PNG at a path like:
 
-`assets/tiles/my_scene_atlas.png`
+`assets/tiled_projects/tiles/shared/my_scene_atlas.png`
 
 Current assumptions:
 
@@ -29,7 +29,7 @@ Update `build_default_scene_atlas()`:
 
 ```cpp
 return AtlasAsset::from_grid_image(
-    "assets/tiles/my_scene_atlas.png",
+    "assets/tiled_projects/tiles/shared/my_scene_atlas.png",
     24,
     24,
     {

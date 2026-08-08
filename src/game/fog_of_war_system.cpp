@@ -28,7 +28,7 @@ void FogOfWarSystem::update(World & world) const {
             .min = {transform->position.x - vision->radius, transform->position.y - vision->radius},
             .max = {transform->position.x + vision->radius, transform->position.y + vision->radius},
         };
-        const std::vector<const CollisionShape *> nearby_colliders = world.collision().query_bounds(vision_bounds);
+        const std::vector<const CollisionShape *> nearby_colliders = world.collision().query_bounds(CollisionChannel::Vision, vision_bounds);
 
         const int min_x = std::max(0, static_cast<int>(std::floor((transform->position.x - vision->radius + half_width) / cell_width)));
         const int max_x = std::min(static_cast<int>(world.fog_width()) - 1, static_cast<int>(std::ceil((transform->position.x + vision->radius + half_width) / cell_width)));
@@ -45,11 +45,11 @@ void FogOfWarSystem::update(World & world) const {
                     continue;
                 }
 
-                if (!nearby_colliders.empty() && world.collision().blocks_point(nearby_colliders, cell_center)) {
+                if (!nearby_colliders.empty() && world.collision().blocks_point(CollisionChannel::Vision, nearby_colliders, cell_center)) {
                     continue;
                 }
 
-                if (!nearby_colliders.empty() && world.collision().blocks_segment(nearby_colliders, transform->position, cell_center)) {
+                if (!nearby_colliders.empty() && world.collision().blocks_segment(CollisionChannel::Vision, nearby_colliders, transform->position, cell_center)) {
                     continue;
                 }
 
