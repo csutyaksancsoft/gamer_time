@@ -29,6 +29,8 @@ Engine code must not include headers from a game. Game code may include and link
 
 ## Build and test
 
+The minimum supported CMake version is 3.22.1. The Windows helper script still requires CMake 4.2 because it targets Visual Studio 2026.
+
 Configure everything:
 
 ```bash

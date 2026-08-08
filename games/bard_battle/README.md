@@ -17,6 +17,8 @@ Open `assets/tiled_projects/bard_battle.tiled-project` in Tiled to edit the defa
 
 ## Build
 
+The Linux dedicated-server build supports CMake 3.22.1 or newer. The Windows client script requires CMake 4.2 for Visual Studio 2026.
+
 From the repository root, build the Windows client and portable ZIP with:
 
 ```powershell
