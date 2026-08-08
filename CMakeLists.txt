@@ -16,6 +16,7 @@ endif()
 function(gt_configure_target target_name)
     target_include_directories(${target_name} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
     if(MSVC)
+        target_compile_definitions(${target_name} PRIVATE NOMINMAX)
         target_compile_options(${target_name} PRIVATE /W4)
     else()
         target_compile_options(${target_name} PRIVATE -Wall -Wextra -Wpedantic)
@@ -31,6 +32,10 @@ add_subdirectory(external/enet EXCLUDE_FROM_ALL)
 
 add_library(gt_core INTERFACE)
 target_include_directories(gt_core INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+add_library(gt_match STATIC src/game/match_rules.cpp src/ui/ui_model.cpp)
+gt_configure_target(gt_match)
+target_link_libraries(gt_match PUBLIC gt_core)
 
 add_library(gt_map STATIC
     src/assets/atlas_asset.cpp
@@ -62,12 +67,16 @@ if(BUILD_TESTING)
     gt_configure_target(gt_render_safety_tests)
     target_link_libraries(gt_render_safety_tests PRIVATE gt_core)
     add_test(NAME render_safety COMMAND gt_render_safety_tests)
+    add_executable(gt_match_ui_tests tests/match_ui_tests.cpp)
+    gt_configure_target(gt_match_ui_tests)
+    target_link_libraries(gt_match_ui_tests PRIVATE gt_match gt_net)
+    add_test(NAME match_ui COMMAND gt_match_ui_tests)
 endif()
 
 if(GT_BUILD_SERVER)
     add_executable(gamer_time_server src/server/server_main.cpp)
     gt_configure_target(gamer_time_server)
-    target_link_libraries(gamer_time_server PRIVATE gt_map gt_net gt_rhythm enet)
+    target_link_libraries(gamer_time_server PRIVATE gt_map gt_net gt_rhythm gt_match enet)
 
     add_executable(gamer_time_bot src/bot/bot_main.cpp)
     gt_configure_target(gamer_time_bot)
@@ -142,7 +151,7 @@ if(GT_BUILD_CLIENT)
 
     add_library(gt_app STATIC src/app/application.cpp)
     gt_configure_target(gt_app)
-    target_link_libraries(gt_app PUBLIC gt_assets gt_game gt_net gt_platform gt_render gt_rhythm)
+    target_link_libraries(gt_app PUBLIC gt_assets gt_game gt_net gt_platform gt_render gt_rhythm gt_match)
 
     if(WIN32)
         add_executable(gamer_time WIN32 src/main.cpp)

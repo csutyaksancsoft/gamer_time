@@ -46,7 +46,6 @@ void Client::connect(const std::string & endpoint, const std::string & name) {
     if (enet_address_set_host(&address_, hostname.c_str()) != 0) fail("Could not resolve server: " + hostname);
     address_.port = port;
     name_ = name;
-    reconnect_deadline_us_ = monotonic_time_us() + 15000000ULL;
     begin_connection();
 }
 
@@ -76,15 +75,13 @@ void Client::update() {
         if (event.type == ENET_EVENT_TYPE_CONNECT) {
             connected_ = true; status_ = "connected"; send(make_hello(name_), true);
         } else if (event.type == ENET_EVENT_TYPE_DISCONNECT) {
-            connected_ = false; player_id_ = 0; status_ = "reconnecting"; peer_ = nullptr; next_reconnect_us_ = monotonic_time_us() + 500000ULL;
+            connected_ = false; player_id_ = 0; status_ = "disconnected"; peer_ = nullptr;
         } else if (event.type == ENET_EVENT_TYPE_RECEIVE) {
             try { receive({event.packet->data, event.packet->dataLength}); } catch (...) { enet_packet_destroy(event.packet); throw; }
             enet_packet_destroy(event.packet);
         }
     }
     const auto now = monotonic_time_us();
-    if (!connected_ && !peer_ && now >= next_reconnect_us_ && now < reconnect_deadline_us_) begin_connection();
-    if (!connected_ && !peer_ && now >= reconnect_deadline_us_) status_ = "reconnect timed out";
     if (connected_ && now - last_ping_us_ >= 500000) { last_ping_us_ = now; send(make_clock_ping(now), false); }
     enet_host_flush(host_);
 }
@@ -111,6 +108,8 @@ void Client::receive(std::span<const std::uint8_t> bytes) {
 
 void Client::send_input(std::int8_t x, std::int8_t y) { send(make_input(++input_sequence_, x, y, monotonic_time_us()), false); }
 void Client::send_rhythm_hit(std::int16_t calibration_ms, Vec2f aim, RhythmAction action) { send(make_rhythm_hit(++rhythm_sequence_, server_time_us(), calibration_ms, aim, action), true); }
+void Client::request_vote(VoteChoice choice) { send(make_vote_request(choice), true); }
+void Client::request_team(TeamId team) { send(make_team_request(team), true); }
 bool Client::take_song_schedule(SongSchedule & schedule) { if(!has_schedule_) return false; schedule=schedule_; has_schedule_=false; return true; }
 bool Client::take_rhythm_result(RhythmResult & result) { if(rhythm_results_.empty()) return false; result=rhythm_results_.front(); rhythm_results_.pop_front(); return true; }
 bool Client::take_sound_event(SoundEvent & event){if(sound_events_.empty())return false;event=sound_events_.front();sound_events_.pop_front();return true;}

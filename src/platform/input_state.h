@@ -1,4 +1,5 @@
 #pragma once
+#include <string>
 
 struct InputState {
     bool quit_requested = false;
@@ -9,6 +10,10 @@ struct InputState {
     bool toggle_text_pressed = false;
     bool left_mouse_pressed = false;
     bool right_mouse_pressed = false;
+    bool tab_held = false;
+    bool enter_pressed = false;
+    bool backspace_pressed = false;
+    std::string text_input;
     bool move_left = false;
     bool move_right = false;
     bool move_up = false;

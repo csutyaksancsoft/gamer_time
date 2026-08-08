@@ -19,6 +19,8 @@ public:
     void update();
     void send_input(std::int8_t x, std::int8_t y);
     void send_rhythm_hit(std::int16_t calibration_ms, Vec2f aim, RhythmAction action);
+    void request_vote(VoteChoice choice);
+    void request_team(TeamId team);
 
     bool connected() const { return connected_; }
     bool welcomed() const { return player_id_ != 0; }
@@ -56,8 +58,6 @@ private:
     std::uint32_t last_sound_event_id_ = 0;
     std::string name_;
     ENetAddress address_{};
-    std::uint64_t reconnect_deadline_us_ = 0;
-    std::uint64_t next_reconnect_us_ = 0;
     std::string status_ = "disconnected";
 };
 

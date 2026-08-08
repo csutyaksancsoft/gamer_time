@@ -34,9 +34,8 @@ int main(int argc, char ** argv) {
             if (argument == "--server" && i + 1 < argc) config.server = argv[++i];
             else if (argument == "--name" && i + 1 < argc) config.player_name = argv[++i];
             else if (argument == "--calibration-ms" && i + 1 < argc) { config.calibration_ms = static_cast<std::int16_t>(std::stoi(argv[++i])); calibration_overridden = true; }
-            else throw std::runtime_error("Usage: gamer_time [--server host:port] --name Player [--calibration-ms N]");
+            else throw std::runtime_error("Usage: gamer_time [--server host:port] [--name Player] [--calibration-ms N]");
         }
-        if (config.player_name.empty()) throw std::runtime_error("A display name is required. Use --name PlayerName");
         config.calibration_ms = static_cast<std::int16_t>(std::clamp<int>(config.calibration_ms, -250, 250));
         if (calibration_overridden) {
             std::ofstream settings(settings_path, std::ios::trunc);

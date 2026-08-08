@@ -9,10 +9,12 @@
 #include "platform/camera_controller.h"
 #include "render/render_world.h"
 #include "render/text_overlay_renderer.h"
+#include "ui/ui_model.h"
 
 #include <span>
 #include <string>
 #include <vector>
+#include <utility>
 
 struct SDL_Window;
 
@@ -23,6 +25,8 @@ public:
 
     void request_resize();
     void set_overlay_text(std::string text);
+    void set_ui_draw_list(ui::DrawList list) { ui_draw_list_ = std::move(list); }
+    const ui::DrawList & ui_draw_list() const { return ui_draw_list_; }
     void set_debug_modes(bool solid_terrain, bool fog_enabled) { solid_terrain_debug_ = solid_terrain; fog_enabled_ = fog_enabled; }
     void initialize_scene_atlas(const AtlasAsset & atlas, const LoadedImage & image);
     void upload_frame_resources(
@@ -72,6 +76,7 @@ private:
     bool fog_enabled_ = true;
     bool frame_upload_valid_ = true;
     std::string frame_diagnostic_;
+    ui::DrawList ui_draw_list_;
 
     void create_render_pass();
     void create_scene_descriptor_set_layout();

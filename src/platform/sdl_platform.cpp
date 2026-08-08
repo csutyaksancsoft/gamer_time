@@ -26,6 +26,7 @@ void SdlPlatform::initialize(const RuntimeConfig & config) {
         SDL_Quit();
         throw std::runtime_error("SDL_CreateWindow failed");
     }
+    SDL_StartTextInput(window_);
 }
 
 void SdlPlatform::shutdown() {
@@ -84,6 +85,8 @@ InputState SdlPlatform::poll_input() {
             }
             if (event.key.key == SDLK_F4) input.toggle_terrain_debug_pressed = true;
             if (event.key.key == SDLK_F5) input.toggle_text_pressed = true;
+            if (event.key.key == SDLK_RETURN || event.key.key == SDLK_KP_ENTER) input.enter_pressed = true;
+            if (event.key.key == SDLK_BACKSPACE) input.backspace_pressed = true;
             if (event.key.key == SDLK_A || event.key.key == SDLK_LEFT) {
                 input.move_left = true;
             }
@@ -97,6 +100,9 @@ InputState SdlPlatform::poll_input() {
                 input.move_down = true;
             }
             break;
+        case SDL_EVENT_TEXT_INPUT:
+            input.text_input += event.text.text;
+            break;
         default:
             break;
         }
@@ -108,6 +114,7 @@ InputState SdlPlatform::poll_input() {
         input.move_right = input.move_right || keyboard_state[SDL_SCANCODE_D] || keyboard_state[SDL_SCANCODE_RIGHT];
         input.move_up = input.move_up || keyboard_state[SDL_SCANCODE_W] || keyboard_state[SDL_SCANCODE_UP];
         input.move_down = input.move_down || keyboard_state[SDL_SCANCODE_S] || keyboard_state[SDL_SCANCODE_DOWN];
+        input.tab_held = keyboard_state[SDL_SCANCODE_TAB];
     }
 
     return input;

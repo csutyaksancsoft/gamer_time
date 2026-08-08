@@ -10,7 +10,7 @@
 
 namespace net {
 
-constexpr std::uint32_t kProtocolVersion = 6;
+constexpr std::uint32_t kProtocolVersion = 7;
 constexpr std::size_t kMaxRhythmNotes = 4096;
 constexpr std::size_t kMaxProjectiles = 1024;
 constexpr std::uint16_t kDefaultPort = 27020;
@@ -32,9 +32,17 @@ enum class MessageType : std::uint8_t {
     rhythm_hit,
     rhythm_result,
     sound_event,
+    vote_request,
+    team_request,
 };
 
-enum class RoomState : std::uint8_t { lobby, countdown, playing, free_move };
+enum class RoomState : std::uint8_t { lobby, voting, countdown, playing, free_move };
+enum class GameMode : std::uint8_t { ffa, teams };
+enum class VoteChoice : std::uint8_t { none, teams, ffa };
+using TeamId = std::uint8_t;
+constexpr TeamId kNoTeam = 0;
+constexpr TeamId kFirstTeam = 1;
+constexpr TeamId kMaxTeam = 4;
 enum class RhythmGrade : std::uint8_t { perfect, good, miss };
 enum class RhythmAction : std::uint8_t { shoot, shield };
 enum class SoundCue : std::uint8_t { death, shot_success, shot_failure, shot_hit_player, shot_hit_shield, shield_success, shield_failure };
@@ -51,6 +59,12 @@ struct PlayerState {
     std::uint64_t respawn_at_us = 0;
     std::uint64_t protected_until_us = 0;
     std::uint64_t shield_until_us = 0;
+    TeamId team = kNoTeam;
+    VoteChoice vote = VoteChoice::none;
+    std::uint32_t round_kills = 0;
+    std::uint32_t round_deaths = 0;
+    std::uint32_t session_kills = 0;
+    std::uint32_t session_deaths = 0;
 };
 
 struct ProjectileState {
@@ -66,6 +80,14 @@ struct Snapshot {
     std::uint32_t server_tick = 0;
     std::vector<PlayerState> players;
     std::vector<ProjectileState> projectiles;
+    RoomState room = RoomState::lobby;
+    GameMode mode = GameMode::ffa;
+    std::uint64_t vote_deadline_us = 0;
+    std::uint8_t eligible_voters = 0;
+    std::uint8_t teams_votes = 0;
+    std::uint8_t ffa_votes = 0;
+    std::uint8_t team_count = 2;
+    bool friendly_fire = false;
 };
 
 struct SongSchedule {
@@ -152,6 +174,12 @@ std::vector<std::uint8_t> make_rhythm_result(const RhythmResult & result);
 RhythmResult read_rhythm_result(Reader & reader);
 std::vector<std::uint8_t> make_sound_event(const SoundEvent & event);
 SoundEvent read_sound_event(Reader & reader);
+std::vector<std::uint8_t> make_vote_request(VoteChoice choice);
+VoteChoice read_vote_request(Reader & reader);
+std::vector<std::uint8_t> make_team_request(TeamId team);
+TeamId read_team_request(Reader & reader);
+bool valid_team(TeamId team, std::uint8_t team_count);
+bool team_switching_allowed(RoomState room);
 const char * sound_cue_name(SoundCue cue);
 
 std::uint64_t monotonic_time_us();

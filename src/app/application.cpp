@@ -3,6 +3,7 @@
 #include "game/map_world.h"
 
 #include <algorithm>
+#include <array>
 #include <sstream>
 #include <utility>
 
@@ -13,7 +14,7 @@ constexpr const char * kDefaultMapName = "maps/grass_tileset_map.tmx";
 } // namespace
 
 Application::Application(RuntimeConfig config)
-    : config_(std::move(config)) {
+    : config_(std::move(config)), menu_name_(config_.player_name), menu_server_(config_.server) {
 }
 
 Application::~Application() {
@@ -61,8 +62,6 @@ void Application::initialize() {
         // Networking and movement remain usable until the real song asset is supplied.
     }
     effect_player_.load(config_.asset_dir + "/audio/sfx");
-    network_.connect(config_.server, config_.player_name);
-
     initialized_ = true;
 }
 
@@ -83,7 +82,7 @@ void Application::shutdown() {
 
 void Application::tick_frame(float dt_seconds) {
     const InputState input = platform_.poll_input();
-    if (input.quit_requested || input.escape_pressed) {
+    if (input.quit_requested || (input.escape_pressed && in_menu_)) {
         running_ = false;
         return;
     }
@@ -99,7 +98,19 @@ void Application::tick_frame(float dt_seconds) {
     if (input.toggle_text_pressed) overlay_text_visible_ = !overlay_text_visible_;
     scene_renderer_.set_debug_modes(solid_terrain_debug_, true);
 
+    if(in_menu_){
+        if(input.left_mouse_pressed){if(input.mouse_y>=245&&input.mouse_y<295)menu_focus_=MenuFocus::name;else if(input.mouse_y>=315&&input.mouse_y<365)menu_focus_=MenuFocus::server;}
+        std::string & field=menu_focus_==MenuFocus::name?menu_name_:menu_server_;
+        if(input.backspace_pressed&&!field.empty())field.pop_back();
+        for(unsigned char c:input.text_input)if(c>=0x20&&c<=0x7e&&field.size()<128)field.push_back(static_cast<char>(c));
+        const bool connect_clicked=input.left_mouse_pressed&&input.mouse_y>=390&&input.mouse_y<440;
+        if(input.enter_pressed||connect_clicked){std::string host;std::uint16_t port;if(!ui::valid_player_name(menu_name_))menu_error_="Name must be 1-24 visible characters.";else if(!ui::parse_endpoint(menu_server_,host,port))menu_error_="Server must be host or host:port.";else try{network_.connect(menu_server_,menu_name_);in_menu_=false;menu_error_.clear();}catch(const std::exception&e){menu_error_=e.what();network_.disconnect();}}
+        const std::array<std::uint8_t,1> visible{255};scene_renderer_.upload_frame_resources({},visible,1,1,camera_controller_.state());scene_renderer_.set_overlay_text(build_menu_text());scene_renderer_.draw_frame();return;
+    }
+
     network_.update();
+    if(network_.connected())was_connected_=true;
+    if(was_connected_&&!network_.connected()){menu_error_="Disconnected: "+network_.status();in_menu_=true;was_connected_=false;const std::array<std::uint8_t,1> visible{255};scene_renderer_.upload_frame_resources({},visible,1,1,camera_controller_.state());scene_renderer_.set_overlay_text(build_menu_text());scene_renderer_.draw_frame();return;}
     net::SoundEvent sound_event{};
     while(network_.take_sound_event(sound_event))effect_player_.play(sound_event.cue,predicted_position_,sound_event.position,sound_event.participant);
     const net::Snapshot & snapshot = network_.snapshot();
@@ -155,7 +166,11 @@ void Application::tick_frame(float dt_seconds) {
         network_.send_input(static_cast<std::int8_t>(movement.x * 127.0f), static_cast<std::int8_t>(movement.y * 127.0f));
     }
     const std::uint64_t rhythm_now_us=net::monotonic_time_us();
-    if(input.left_mouse_pressed&&local_alive_){const Vec2f target=screen_to_world(input.mouse_x,input.mouse_y,input.window_width,input.window_height,camera_controller_.state());const Vec2f aim=normalize_or_zero(target-predicted_position_);rhythm_hud_.predict_hit(rhythm_now_us,config_.calibration_ms);network_.send_rhythm_hit(config_.calibration_ms,aim,net::RhythmAction::shoot);}
+    const bool voting=snapshot.room==net::RoomState::voting;
+    bool ui_consumed=false;
+    if(input.tab_held&&input.left_mouse_pressed&&net::team_switching_allowed(snapshot.room)&&snapshot.team_count>=2){const int segment=std::clamp(input.mouse_x*int(snapshot.team_count)/(std::max)(input.window_width,1),0,int(snapshot.team_count)-1);network_.request_team(static_cast<net::TeamId>(segment+1));ui_consumed=true;}
+    if(voting&&input.left_mouse_pressed){if(input.mouse_y>=300&&input.mouse_y<350){network_.request_vote(net::VoteChoice::teams);ui_consumed=true;}else if(input.mouse_y>=360&&input.mouse_y<410){network_.request_vote(net::VoteChoice::ffa);ui_consumed=true;}}
+    if(input.left_mouse_pressed&&!ui_consumed&&local_alive_){const Vec2f target=screen_to_world(input.mouse_x,input.mouse_y,input.window_width,input.window_height,camera_controller_.state());const Vec2f aim=normalize_or_zero(target-predicted_position_);rhythm_hud_.predict_hit(rhythm_now_us,config_.calibration_ms);network_.send_rhythm_hit(config_.calibration_ms,aim,net::RhythmAction::shoot);}
     else if(input.right_mouse_pressed&&local_alive_){rhythm_hud_.predict_hit(rhythm_now_us,config_.calibration_ms);network_.send_rhythm_hit(config_.calibration_ms,{},net::RhythmAction::shield);}
     net::SongSchedule schedule{};
     if(network_.take_song_schedule(schedule)) {
@@ -186,10 +201,16 @@ void Application::tick_frame(float dt_seconds) {
         world_.fog_height(),
         camera_controller_.state()
     );
-    scene_renderer_.set_overlay_text(render_world.overlay_text);
+    if(input.tab_held)scene_renderer_.set_overlay_text(build_scoreboard_text());
+    else if(voting){const auto remaining=snapshot.vote_deadline_us>network_.server_time_us()?(snapshot.vote_deadline_us-network_.server_time_us()+999999)/1000000:0;std::ostringstream text;text<<"VOTE: MATCH MODE ("<<remaining<<"s)\n\nTEAMS [click y=300]  "<<unsigned(snapshot.teams_votes)<<"\nFREE-FOR-ALL [click y=360]  "<<unsigned(snapshot.ffa_votes)<<"\n\nVotes "<<unsigned(snapshot.teams_votes+snapshot.ffa_votes)<<" / "<<unsigned(snapshot.eligible_voters);scene_renderer_.set_overlay_text(text.str());}
+    else scene_renderer_.set_overlay_text(render_world.overlay_text);
     scene_renderer_.draw_frame();
     update_window_title(batch);
 }
+
+std::string Application::build_menu_text() const {std::ostringstream out;out<<"GAMER TIME\n\nName"<<(menu_focus_==MenuFocus::name?" > ":"   ")<<menu_name_<<"\n\nServer/IP"<<(menu_focus_==MenuFocus::server?" > ":"   ")<<menu_server_<<"\n\nCONNECT (Enter)\n";if(!menu_error_.empty())out<<"\nERROR: "<<menu_error_<<'\n';return out.str();}
+
+std::string Application::build_scoreboard_text() const {const auto&s=network_.snapshot();std::ostringstream out;out<<(s.mode==net::GameMode::teams?"TEAMS":"FREE-FOR-ALL")<<" SCOREBOARD\n";auto row=[&](const net::PlayerState&p){out<<ui::truncate_ellipsis(p.name,18)<<"  R "<<p.round_kills<<'/'<<p.round_deaths<<"  S "<<p.session_kills<<'/'<<p.session_deaths<<'\n';};if(s.mode==net::GameMode::teams){for(const auto&g:ui::sort_teams(s.players,s.team_count)){out<<"\nTEAM "<<unsigned(g.team)<<" - "<<g.kills<<" KILLS\n";for(const auto&p:g.players)row(p);}}else for(const auto&p:ui::sort_ffa(s.players))row(p);if(net::team_switching_allowed(s.room))out<<"\nChoose team: Red / Blue"<<(s.team_count>2?" / Green":"")<<(s.team_count>3?" / Gold":"");return out.str();}
 
 void Application::update_window_title(const RenderBatch & batch) const {
     std::string title = "gamer_time | units: ";

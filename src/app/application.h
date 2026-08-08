@@ -20,6 +20,7 @@
 #include "render/render_extractor.h"
 #include "render/render_world.h"
 #include "render/scene_renderer.h"
+#include "ui/ui_model.h"
 
 #include <chrono>
 #include <string>
@@ -37,6 +38,8 @@ private:
     void tick_frame(float dt_seconds);
     void update_window_title(const RenderBatch & batch) const;
     std::string build_overlay_text() const;
+    std::string build_menu_text() const;
+    std::string build_scoreboard_text() const;
 
     RuntimeConfig config_;
     SdlPlatform platform_;
@@ -70,4 +73,10 @@ private:
     bool have_rhythm_result_ = false;
     bool local_alive_ = true;
     std::uint64_t local_respawn_at_us_ = 0;
+    bool in_menu_ = true;
+    enum class MenuFocus { name, server } menu_focus_ = MenuFocus::name;
+    std::string menu_name_;
+    std::string menu_server_;
+    std::string menu_error_;
+    bool was_connected_ = false;
 };
