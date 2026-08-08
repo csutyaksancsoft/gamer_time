@@ -15,7 +15,7 @@ AtlasAsset AtlasAsset::from_grid_image(
 }
 
 std::uint32_t AtlasAsset::tile_count() const {
-    return columns * rows;
+    return logical_tile_count != 0 ? logical_tile_count : columns * rows;
 }
 
 bool AtlasAsset::is_valid() const {

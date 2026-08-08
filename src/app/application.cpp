@@ -11,7 +11,7 @@
 
 namespace {
 
-constexpr const char * kDefaultMapName = "maps/grass_tileset_map.tmx";
+constexpr const char * kDefaultMapName = "maps/brawlers_ballad.tmx";
 
 } // namespace
 
@@ -50,11 +50,13 @@ void Application::initialize() {
     const std::string map_path = config_.asset_dir + "/" + kDefaultMapName;
     const TmxMapAsset map_asset = assets::load_tmx_map(map_path);
     world_.set_map(MapWorld::from_tmx(map_asset));
-    scene_atlas_ = assets::build_atlas_from_tmx(map_asset, assets::resolve_tmx_tileset_image_path(map_asset));
-    scene_atlas_image_ = assets::load_png_rgba(scene_atlas_.image_path);
+    RuntimeAtlas runtime_atlas = assets::build_runtime_atlas(map_asset);
+    scene_atlas_ = std::move(runtime_atlas.atlas);
+    scene_atlas_image_ = std::move(runtime_atlas.image);
     player_sprite_base_ = scene_atlas_.tile_count();
     const LoadedImage placeholder_atlas = assets::load_png_rgba(config_.asset_dir + "/tiles/sample_scene_atlas.png");
-    assets::append_bottom_row_sprites(scene_atlas_image_, placeholder_atlas, 4);
+    assets::append_packed_sprites(scene_atlas_image_, placeholder_atlas, 4, scene_atlas_.tile_width, scene_atlas_.columns, player_sprite_base_);
+    scene_atlas_.logical_tile_count += 4;
     scene_atlas_.columns = scene_atlas_image_.width / scene_atlas_.tile_width;
     scene_atlas_.rows = scene_atlas_image_.height / scene_atlas_.tile_height;
     scene_renderer_.initialize_scene_atlas(scene_atlas_, scene_atlas_image_);
@@ -227,7 +229,8 @@ void Application::tick_frame(float dt_seconds) {
         world_,
         camera_controller_.state(),
         show_collision_debug_,
-        overlay_text_visible_ ? build_overlay_text() : std::string{}
+        overlay_text_visible_ ? build_overlay_text() : std::string{},
+        rhythm_now_us / 1000u
     );
     frustum_culler_.run(render_world, input.window_width, input.window_height);
     projection_system_.run(render_world, input.window_width, input.window_height);

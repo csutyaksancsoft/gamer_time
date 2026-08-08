@@ -17,7 +17,7 @@ namespace {
 std::string read_text_file(const std::string & path) {
     std::ifstream file(path);
     if (!file) {
-        fail("Failed to open TMX map: " + path);
+        fail("Failed to open TMX/TSX file: " + path);
     }
 
     std::ostringstream buffer;
@@ -191,20 +191,38 @@ std::vector<TmxProperty> parse_properties(const std::string & tag_block) {
     return properties;
 }
 
-TmxTilesetAsset parse_tileset(const std::string & tileset_block) {
+TmxTilesetAsset parse_tileset(const std::string & tileset_block, std::uint32_t first_gid, const std::string & source_path) {
     const std::string image_tag = extract_tag_block(tileset_block, "image");
 
     TmxTilesetAsset tileset{};
-    tileset.first_gid = parse_u32_attribute(tileset_block, "firstgid");
+    tileset.first_gid = first_gid;
     tileset.name = extract_attribute(tileset_block, "name");
     tileset.tile_width = parse_u32_attribute(tileset_block, "tilewidth");
     tileset.tile_height = parse_u32_attribute(tileset_block, "tileheight");
     tileset.tile_count = parse_u32_attribute_or(tileset_block, "tilecount", 0);
     tileset.columns = parse_u32_attribute_or(tileset_block, "columns", 0);
+    tileset.margin = parse_u32_attribute_or(tileset_block, "margin", 0);
+    tileset.spacing = parse_u32_attribute_or(tileset_block, "spacing", 0);
+    tileset.object_alignment = extract_attribute(tileset_block, "objectalignment");
+    if (tileset.object_alignment.empty()) tileset.object_alignment = "unspecified";
+    tileset.source_path = source_path;
     tileset.image_source = extract_attribute(image_tag, "source");
     tileset.image_width = parse_u32_attribute_or(image_tag, "width", 0);
     tileset.image_height = parse_u32_attribute_or(image_tag, "height", 0);
     tileset.properties = parse_properties(tileset_block);
+    const std::string offset = extract_tag_block(tileset_block, "tileoffset");
+    tileset.tile_offset_x = static_cast<std::int32_t>(parse_float_attribute_or(offset, "x", 0.0f));
+    tileset.tile_offset_y = static_cast<std::int32_t>(parse_float_attribute_or(offset, "y", 0.0f));
+    for (const std::string & tile : extract_tag_blocks(tileset_block, "tile")) {
+        const std::string animation = extract_tag_block(tile, "animation");
+        if (animation.empty()) continue;
+        TmxTileAnimation parsed{};
+        parsed.tile_id = parse_u32_attribute(tile, "id");
+        for (const std::string & frame : extract_tag_blocks(animation, "frame")) {
+            parsed.frames.push_back({parse_u32_attribute(frame, "tileid"), parse_u32_attribute(frame, "duration")});
+        }
+        tileset.animations.push_back(std::move(parsed));
+    }
     return tileset;
 }
 
@@ -287,6 +305,8 @@ TmxObjectLayerAsset parse_object_layer(const std::string & object_group_block) {
     layer.visible = parse_bool_attribute_or(object_group_block, "visible", true);
     layer.opacity = parse_float_attribute_or(object_group_block, "opacity", 1.0f);
     layer.properties = parse_properties(object_group_block);
+    layer.draw_order = extract_attribute(object_group_block, "draworder");
+    if (layer.draw_order.empty()) layer.draw_order = "topdown";
 
     for (const std::string & object_block : extract_tag_blocks(object_group_block, "object")) {
         layer.objects.push_back(parse_object(object_block));
@@ -357,7 +377,16 @@ TmxMapAsset load_tmx_map(const std::string & map_path) {
     map.properties = parse_properties(map_tag);
 
     for (const std::string & tileset_block : extract_tag_blocks(map_tag, "tileset")) {
-        map.tilesets.push_back(parse_tileset(tileset_block));
+        const std::uint32_t first_gid = parse_u32_attribute(tileset_block, "firstgid");
+        const std::string source = extract_attribute(tileset_block, "source");
+        if (source.empty()) {
+            map.tilesets.push_back(parse_tileset(tileset_block, first_gid, map_path));
+        } else {
+            const std::filesystem::path tsx_path = std::filesystem::path(map_path).parent_path() / source;
+            const std::string tsx_xml = read_text_file(tsx_path.lexically_normal().string());
+            const std::string tsx_tag = extract_tag_block(tsx_xml, "tileset");
+            map.tilesets.push_back(parse_tileset(tsx_tag, first_gid, tsx_path.lexically_normal().string()));
+        }
     }
     if (map.tilesets.empty()) {
         fail("TMX map must contain at least one tileset");
@@ -370,15 +399,16 @@ TmxMapAsset load_tmx_map(const std::string & map_path) {
 
 std::string resolve_tmx_tileset_image_path(const TmxMapAsset & map, std::size_t tileset_index) {
     const TmxTilesetAsset & tileset = require_tileset(map, tileset_index);
-    const std::filesystem::path map_dir = std::filesystem::path(map.map_path).parent_path();
+    const std::filesystem::path map_dir = std::filesystem::path(tileset.source_path).parent_path();
     const std::filesystem::path relative_candidate = map_dir / tileset.image_source;
     if (std::filesystem::exists(relative_candidate)) {
         return relative_candidate.string();
     }
 
-    const std::filesystem::path tiles_candidate = map_dir.parent_path() / "tiles" / tileset.image_source;
-    if (std::filesystem::exists(tiles_candidate)) {
-        return tiles_candidate.string();
+    // Preserve the legacy map layout whose embedded image source omits ../tiles/.
+    if (tileset.source_path == map.map_path) {
+        const std::filesystem::path legacy_candidate = map_dir.parent_path() / "tiles" / tileset.image_source;
+        if (std::filesystem::exists(legacy_candidate)) return legacy_candidate.string();
     }
 
     fail("Failed to resolve TMX tileset image: " + tileset.image_source);

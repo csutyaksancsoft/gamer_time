@@ -1,4 +1,5 @@
 #include "render/batch_builder.h"
+#include "assets/tmx_map_loader.h"
 
 RenderBatch BatchBuilder::build(const RenderWorld & render_world) const {
     RenderBatch batch{};
@@ -24,6 +25,9 @@ RenderBatch BatchBuilder::build(const RenderWorld & render_world) const {
             instance.size = tile.size;
             instance.sprite_index = tile.atlas_index;
             instance.flags = kInstanceFlagTerrain;
+            if (tile.transform_flags & assets::kTmxFlipHorizontal) instance.flags |= kInstanceFlagTmxFlipHorizontal;
+            if (tile.transform_flags & assets::kTmxFlipVertical) instance.flags |= kInstanceFlagTmxFlipVertical;
+            if (tile.transform_flags & assets::kTmxFlipDiagonal) instance.flags |= kInstanceFlagTmxFlipDiagonal;
             instance.opacity = layer.opacity;
             batch.instances.push_back(instance);
         }
@@ -43,7 +47,10 @@ RenderBatch BatchBuilder::build(const RenderWorld & render_world) const {
         instance.flags = projected.source.selected ? kInstanceFlagSelected : 0u;
         if(projected.source.solid_color)instance.flags|=kInstanceFlagSolidColor;
         if(projected.source.circle_outline)instance.flags|=kInstanceFlagCircleOutline;
-        instance.opacity = 1.0f;
+        if (projected.source.transform_flags & assets::kTmxFlipHorizontal) instance.flags |= kInstanceFlagTmxFlipHorizontal;
+        if (projected.source.transform_flags & assets::kTmxFlipVertical) instance.flags |= kInstanceFlagTmxFlipVertical;
+        if (projected.source.transform_flags & assets::kTmxFlipDiagonal) instance.flags |= kInstanceFlagTmxFlipDiagonal;
+        instance.opacity = projected.source.opacity;
         instance.rotation_radians=projected.source.rotation_radians;
         for(int i=0;i<4;++i)instance.color[i]=projected.source.color[i];
         batch.instances.push_back(instance);

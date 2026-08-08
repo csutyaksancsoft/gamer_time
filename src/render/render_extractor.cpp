@@ -9,7 +9,8 @@ RenderWorld RenderExtractor::build(
     const World & world,
     const CameraState & camera,
     bool show_collision_debug,
-    std::string overlay_text
+    std::string overlay_text,
+    std::uint64_t animation_time_ms
 ) const {
     RenderWorld render_world{};
     render_world.camera = camera;
@@ -39,12 +40,31 @@ RenderWorld RenderExtractor::build(
                     world_y,
                 };
                 tile.size = map.tile_size();
-                tile.atlas_index = atlas_index;
+                tile.atlas_index = map.resolve_animated_index(atlas_index, animation_time_ms);
+                const std::size_t offset = static_cast<std::size_t>(y) * layer.width + x;
+                tile.transform_flags = offset < layer.transform_flags.size() ? layer.transform_flags[offset] : 0;
                 render_layer.tiles.push_back(tile);
             }
         }
 
         render_world.terrain_layers.push_back(std::move(render_layer));
+    }
+
+    for (const ObjectLayer & layer : map.object_layers()) {
+        if (!layer.visible || layer.opacity <= 0.0f) continue;
+        for (const MapObject & object : layer.objects) {
+            if (!object.is_tile || !object.visible || object.atlas_index == kEmptyAtlasIndex) continue;
+            RenderUnit sprite{};
+            sprite.id = object.id;
+            sprite.world_pos = object.position;
+            sprite.size = object.size;
+            sprite.sprite_index = map.resolve_animated_index(object.atlas_index, animation_time_ms);
+            sprite.rotation_radians = object.rotation * 0.01745329251994329577f;
+            sprite.opacity = object.opacity;
+            sprite.transform_flags = object.transform_flags;
+            sprite.stable_order = (static_cast<std::uint64_t>(object.layer_order) << 32u) | object.source_order;
+            render_world.units.push_back(sprite);
+        }
     }
 
     render_world.units.reserve(world.unit_count());

@@ -4,8 +4,8 @@ Current state of the codebase:
 
 - The renderer is now atlas-backed and no longer depends on the old generated scene colors.
 - The temporary placeholder terrain seed has been removed from startup wiring.
-- The app currently loads `assets/maps/grass_tileset_map.tmx` by default.
-- The app currently resolves the tileset image from the TMX and loads `assets/tiles/grass_tileset_16x16.png`.
+- The app loads `assets/maps/brawlers_ballad.tmx` by default.
+- The app resolves and packs all external tilesets referenced by that map.
 - There is an initial TMX loader in:
   `src/assets/tmx_map_loader.h`
   `src/assets/tmx_map_loader.cpp`
@@ -58,7 +58,7 @@ Files the next agent should inspect first:
 - `src/render/render_extractor.cpp`
 - `src/render/batch_builder.cpp`
 - `src/render/scene_renderer.cpp`
-- `assets/maps/grass_tileset_map.tmx`
+- `assets/maps/brawlers_ballad.tmx`
 
 # TMX Integration Roadmap
 
@@ -76,14 +76,14 @@ to:
 - optional engine-side interpretation of known content
 - safe preservation of unknown content for future systems
 
-The current example map at `assets/maps/grass_tileset_map.tmx` already demonstrates the shape the engine needs to support:
+The current example map at `assets/maps/brawlers_ballad.tmx` demonstrates the supported external-tileset workflow:
 
 - multiple tile layers authored in order
 - one object group:
   `collision`
 - one collision object containing a polygon
 - tileset image:
-  `assets/tiles/grass_tileset_16x16.png`
+  the normalized PNG files under `assets/tiles/`
 
 ## Architectural Intent
 

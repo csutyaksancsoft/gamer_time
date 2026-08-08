@@ -17,6 +17,9 @@ constexpr std::uint32_t kInstanceFlagSolidColor = 1u << 5;
 constexpr std::uint32_t kInstanceFlagCircleOutline = 1u << 6;
 constexpr std::uint32_t kInstanceFlagMenuImage = 1u << 7;
 constexpr std::uint32_t kInstanceFlagScoreboardImage = 1u << 8;
+constexpr std::uint32_t kInstanceFlagTmxFlipHorizontal = 1u << 16;
+constexpr std::uint32_t kInstanceFlagTmxFlipVertical = 1u << 17;
+constexpr std::uint32_t kInstanceFlagTmxFlipDiagonal = 1u << 18;
 
 struct RenderUnit {
     UnitId id = 0;
@@ -29,12 +32,16 @@ struct RenderUnit {
     bool solid_color = false;
     bool circle_outline = false;
     float color[4]{1.0f,1.0f,1.0f,1.0f};
+    float opacity = 1.0f;
+    std::uint32_t transform_flags = 0;
+    std::uint64_t stable_order = 0;
 };
 
 struct RenderTile {
     Vec2f world_pos{};
     Vec2f size{24.0f, 24.0f};
     std::uint32_t atlas_index = 0;
+    std::uint32_t transform_flags = 0;
 };
 
 struct RenderTileLayer {

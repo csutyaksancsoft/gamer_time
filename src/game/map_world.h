@@ -42,6 +42,12 @@ struct MapObject {
     float rotation = 0.0f;
     bool visible = true;
     std::uint32_t gid = 0;
+    std::uint32_t atlas_index = kEmptyAtlasIndex;
+    std::uint32_t transform_flags = 0;
+    bool is_tile = false;
+    float opacity = 1.0f;
+    std::uint32_t layer_order = 0;
+    std::uint32_t source_order = 0;
     MapObjectShape shape = MapObjectShape::None;
     bool has_polygon = false;
     bool is_point = false;
@@ -64,6 +70,7 @@ struct TileLayer {
     std::uint32_t width = 0;
     std::uint32_t height = 0;
     std::vector<std::uint32_t> atlas_indices;
+    std::vector<std::uint32_t> transform_flags;
     std::vector<MapProperty> properties;
 
     std::size_t tile_count() const {
@@ -72,6 +79,9 @@ struct TileLayer {
 
     std::uint32_t atlas_index_at(std::uint32_t x, std::uint32_t y, std::uint32_t fallback = 0) const;
 };
+
+struct MapAnimationFrame { std::uint32_t atlas_index = 0; std::uint32_t duration_ms = 0; };
+struct MapAnimation { std::uint32_t atlas_index = 0; std::uint64_t total_duration_ms = 0; std::vector<MapAnimationFrame> frames; };
 
 struct ObjectLayer {
     std::uint32_t id = 0;
@@ -110,6 +120,8 @@ public:
     const std::vector<TileLayer> & tile_layers() const { return tile_layers_; }
     const std::vector<ObjectLayer> & object_layers() const { return object_layers_; }
     const std::vector<CollisionPolygon> & collision_polygons() const { return collision_polygons_; }
+    const std::vector<MapAnimation> & animations() const { return animations_; }
+    std::uint32_t resolve_animated_index(std::uint32_t atlas_index, std::uint64_t time_ms) const;
 
     const TileLayer * find_tile_layer(std::string_view name) const;
     const ObjectLayer * find_object_layer(std::string_view name) const;
@@ -124,4 +136,5 @@ private:
     std::vector<TileLayer> tile_layers_;
     std::vector<ObjectLayer> object_layers_;
     std::vector<CollisionPolygon> collision_polygons_;
+    std::vector<MapAnimation> animations_;
 };

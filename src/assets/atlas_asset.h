@@ -11,6 +11,7 @@ struct AtlasAsset {
     std::uint32_t tile_height = 0;
     std::uint32_t columns = 0;
     std::uint32_t rows = 0;
+    std::uint32_t logical_tile_count = 0;
     std::unordered_map<std::string, std::uint32_t> tile_ids_by_name;
 
     static AtlasAsset from_grid_image(

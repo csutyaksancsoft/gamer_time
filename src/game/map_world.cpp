@@ -5,6 +5,7 @@
 #include <charconv>
 #include <string_view>
 #include <system_error>
+#include <limits>
 
 namespace {
 
@@ -165,7 +166,33 @@ MapWorld MapWorld::from_tmx(const TmxMapAsset & map_asset) {
         fail("TMX map must contain at least one tileset before conversion to MapWorld");
     }
 
-    const TmxTilesetAsset & primary_tileset = map_asset.tilesets.front();
+    std::vector<std::uint32_t> packed_bases;
+    std::uint64_t packed_count = 0;
+    std::uint64_t previous_end = 0;
+    for (const TmxTilesetAsset & tileset : map_asset.tilesets) {
+        if (tileset.tile_width != map_asset.tile_width || tileset.tile_height != map_asset.tile_height ||
+            tileset.tile_count == 0 || tileset.columns == 0 || tileset.first_gid < previous_end) {
+            fail("Invalid or overlapping TMX tileset metadata: " + tileset.name);
+        }
+        previous_end = static_cast<std::uint64_t>(tileset.first_gid) + tileset.tile_count;
+        if (packed_count + tileset.tile_count > std::numeric_limits<std::uint32_t>::max()) fail("TMX packed atlas is too large");
+        packed_bases.push_back(static_cast<std::uint32_t>(packed_count));
+        packed_count += tileset.tile_count;
+    }
+    auto resolve_gid = [&](std::uint32_t raw_gid) -> std::pair<std::uint32_t, std::uint32_t> {
+        const std::uint32_t flags = raw_gid & assets::kTmxTransformMask;
+        const std::uint32_t gid = raw_gid & assets::kTmxGidMask;
+        if (gid == 0) return {kEmptyAtlasIndex, flags};
+        for (std::size_t i = map_asset.tilesets.size(); i-- > 0;) {
+            const auto & ts = map_asset.tilesets[i];
+            if (gid >= ts.first_gid) {
+                const std::uint32_t local = gid - ts.first_gid;
+                if (local >= ts.tile_count) break;
+                return {packed_bases[i] + local, flags};
+            }
+        }
+        fail("TMX GID does not belong to a tileset: " + std::to_string(gid));
+    };
 
     MapWorld map{};
     map.width_ = map_asset.width;
@@ -195,12 +222,11 @@ MapWorld MapWorld::from_tmx(const TmxMapAsset & map_asset) {
             layer.properties = to_map_properties(source.properties);
             layer.atlas_indices.reserve(source.gids.size());
 
+            layer.transform_flags.reserve(source.gids.size());
             for (std::uint32_t gid : source.gids) {
-                if (gid == 0 || gid < primary_tileset.first_gid) {
-                    layer.atlas_indices.push_back(kEmptyAtlasIndex);
-                } else {
-                    layer.atlas_indices.push_back(gid - primary_tileset.first_gid);
-                }
+                const auto [index, flags] = resolve_gid(gid);
+                layer.atlas_indices.push_back(index);
+                layer.transform_flags.push_back(flags);
             }
 
             map.tile_layers_.push_back(std::move(layer));
@@ -216,7 +242,9 @@ MapWorld MapWorld::from_tmx(const TmxMapAsset & map_asset) {
         layer.properties = to_map_properties(source.properties);
         layer.objects.reserve(source.objects.size());
 
-        for (const TmxObjectAsset & source_object : source.objects) {
+        const std::uint32_t runtime_layer_order = static_cast<std::uint32_t>(map.object_layers_.size());
+        for (std::size_t source_index = 0; source_index < source.objects.size(); ++source_index) {
+            const TmxObjectAsset & source_object = source.objects[source_index];
             MapObject object{};
             object.id = source_object.id;
             object.name = source_object.name;
@@ -226,10 +254,33 @@ MapWorld MapWorld::from_tmx(const TmxMapAsset & map_asset) {
             object.rotation = source_object.rotation;
             object.visible = source_object.visible;
             object.gid = source_object.gid;
+            object.layer_order = runtime_layer_order;
+            object.source_order = static_cast<std::uint32_t>(source_index);
+            object.opacity = source.opacity;
+            if (source_object.gid != 0) {
+                const auto [index, flags] = resolve_gid(source_object.gid);
+                object.atlas_index = index;
+                object.transform_flags = flags;
+                object.is_tile = true;
+                object.shape = MapObjectShape::None;
+                if (object.size.x == 0.0f) object.size.x = map.tile_size_.x;
+                if (object.size.y == 0.0f) object.size.y = map.tile_size_.y;
+                std::size_t set_index = 0;
+                while (set_index + 1 < packed_bases.size() && index >= packed_bases[set_index + 1]) ++set_index;
+                const auto & ts = map_asset.tilesets[set_index];
+                std::string alignment = ts.object_alignment == "unspecified" ? "bottomleft" : ts.object_alignment;
+                if (alignment == "topleft" || alignment == "left" || alignment == "bottomleft") object.position.x += object.size.x * 0.5f;
+                if (alignment == "topright" || alignment == "right" || alignment == "bottomright") object.position.x -= object.size.x * 0.5f;
+                if (alignment == "topleft" || alignment == "top" || alignment == "topright") object.position.y -= object.size.y * 0.5f;
+                if (alignment == "bottomleft" || alignment == "bottom" || alignment == "bottomright") object.position.y += object.size.y * 0.5f;
+                object.position.x += static_cast<float>(ts.tile_offset_x);
+                object.position.y -= static_cast<float>(ts.tile_offset_y);
+            }
             object.is_point = source_object.is_point;
-            object.shape = source_object.has_polygon ? MapObjectShape::Polygon
-                           : source_object.is_point  ? MapObjectShape::Point
-                                                     : MapObjectShape::Rectangle;
+            object.shape = object.is_tile ? MapObjectShape::None
+                         : source_object.has_polygon ? MapObjectShape::Polygon
+                         : source_object.is_point  ? MapObjectShape::Point
+                                                   : MapObjectShape::Rectangle;
             object.has_polygon = source_object.has_polygon;
             object.properties = to_map_properties(source_object.properties);
             if (source_object.has_polygon) {
@@ -250,7 +301,34 @@ MapWorld MapWorld::from_tmx(const TmxMapAsset & map_asset) {
         map.object_layers_.push_back(std::move(layer));
     }
 
+    for (std::size_t i = 0; i < map_asset.tilesets.size(); ++i) {
+        const auto & ts = map_asset.tilesets[i];
+        for (const auto & source : ts.animations) {
+            if (source.tile_id >= ts.tile_count || source.frames.empty()) fail("Invalid or empty tile animation in tileset: " + ts.name);
+            MapAnimation animation{};
+            animation.atlas_index = packed_bases[i] + source.tile_id;
+            for (const auto & frame : source.frames) {
+                if (frame.tile_id >= ts.tile_count || frame.duration_ms == 0) fail("Invalid tile animation frame in tileset: " + ts.name);
+                animation.frames.push_back({packed_bases[i] + frame.tile_id, frame.duration_ms});
+                animation.total_duration_ms += frame.duration_ms;
+            }
+            map.animations_.push_back(std::move(animation));
+        }
+    }
+
     return map;
+}
+
+std::uint32_t MapWorld::resolve_animated_index(std::uint32_t atlas_index, std::uint64_t time_ms) const {
+    for (const MapAnimation & animation : animations_) {
+        if (animation.atlas_index != atlas_index) continue;
+        std::uint64_t phase = time_ms % animation.total_duration_ms;
+        for (const MapAnimationFrame & frame : animation.frames) {
+            if (phase < frame.duration_ms) return frame.atlas_index;
+            phase -= frame.duration_ms;
+        }
+    }
+    return atlas_index;
 }
 
 bool MapWorld::empty() const {

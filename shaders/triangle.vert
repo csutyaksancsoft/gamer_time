@@ -50,6 +50,10 @@ void main() {
 
     gl_Position = vec4(ndc, 0.0, 1.0);
     vec2 tileUv = vec2(inQuadUv.x, 1.0 - inQuadUv.y);
+    // Tiled applies the diagonal (anti-diagonal) transform before H/V flips.
+    if ((inFlags & (1u << 18)) != 0u) tileUv = vec2(1.0 - tileUv.y, 1.0 - tileUv.x);
+    if ((inFlags & (1u << 16)) != 0u) tileUv.x = 1.0 - tileUv.x;
+    if ((inFlags & (1u << 17)) != 0u) tileUv.y = 1.0 - tileUv.y;
     vUv = tileUv;
     vWorldPos = worldPos;
     vSpriteIndex = inSpriteIndex;

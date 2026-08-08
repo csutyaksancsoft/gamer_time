@@ -7,7 +7,7 @@
 #include <vector>
 
 namespace server {
-struct Config {std::string bind="0.0.0.0",map="assets/maps/grass_tileset_map.tmx",songs_dir="assets/audio/songs";std::uint8_t team_count=2;bool friendly_fire=false,mode_vote=true,song_vote=true;net::GameMode mode=net::GameMode::ffa;std::uint8_t song_count=3;std::string force_song;};
+struct Config {std::string bind="0.0.0.0",map="assets/maps/brawlers_ballad.tmx",songs_dir="assets/audio/songs";std::uint8_t team_count=2;bool friendly_fire=false,mode_vote=true,song_vote=true;net::GameMode mode=net::GameMode::ffa;std::uint8_t song_count=3;std::string force_song;};
 struct RuntimeSettings {bool mode_vote=true,song_vote=true;net::GameMode mode=net::GameMode::ffa;std::uint8_t song_count=3;std::string force_song;std::uint8_t team_count=2;bool friendly_fire=false;};
 struct RoundConfig {bool mode_vote=true,song_vote=true;net::GameMode mode=net::GameMode::ffa;std::uint8_t song_count=3;std::string force_song;std::vector<std::string> songs;};
 Config parse_startup(int argc,char **argv);

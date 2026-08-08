@@ -67,11 +67,11 @@ always `27020`; do not include it in the argument.
 
 Selects the TMX map loaded at startup.
 
-- Default: `assets/maps/grass_tileset_map.tmx`
+- Default: `assets/maps/brawlers_ballad.tmx`
 - A missing or malformed map prevents startup.
 
 ```bash
-./build-server/gamer_time_server --map assets/maps/grass_tileset_map.tmx
+./build-server/gamer_time_server --map assets/maps/brawlers_ballad.tmx
 ```
 
 ### `--songs-dir PATH`
