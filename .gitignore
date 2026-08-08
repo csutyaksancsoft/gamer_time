@@ -46,3 +46,4 @@ build-codex/
 build-server/
 build-windows*/
 /external/enet/
+*.tiled-session
