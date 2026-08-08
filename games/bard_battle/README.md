@@ -1,6 +1,6 @@
 # Bard Battle
 
-Bard Battle is a networked rhythm-combat arena built with Attempt Engine. Players move with WASD and time shots or shields to the song. An authoritative server manages movement, projectiles, rounds, mode/song voting, teams, scoring, respawns, and observer sound visibility; the client renders the arena, UI, audio, and cosmetic fog of war.
+Bard Battle is a networked rhythm-combat arena built with Attempt Engine. Players move with WASD and time shots, shields, or melee swings to the song. An authoritative server manages movement, combat, rounds, mode/song voting, teams, scoring, respawns, and observer sound visibility; the client renders the arena, UI, audio, and cosmetic fog of war.
 
 ## Layout
 
@@ -40,10 +40,20 @@ Client options:
 --server IP --name Player --calibration-ms N
 ```
 
+Controls:
+
+```text
+WASD          Move
+Left mouse    Shoot toward the cursor
+Right mouse   Shield for one beat
+Space         Melee toward the cursor
+Tab           Scoreboard
+```
+
 Server startup options:
 
 ```text
 --bind IP --map PATH --songs-dir PATH --help
 ```
 
-The server console supports `status`, `songs`, `start`, `stop`, `set`, `kick`, `help`, and `quit`.
+The server console supports `status`, `songs`, `start`, `stop`, `set`, `kick`, `help`, and `quit`. See [`src/server/README.md`](src/server/README.md) for the complete live-setting command list, including shield freeze and melee shield behavior.

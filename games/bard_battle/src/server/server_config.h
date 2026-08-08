@@ -7,8 +7,8 @@
 #include <vector>
 
 namespace server {
-struct Config {std::string bind="0.0.0.0",map="games/bard_battle/assets/tiled_projects/maps/brawlers_ballad.tmx",songs_dir="games/bard_battle/assets/audio/songs";std::uint8_t team_count=2;bool friendly_fire=false,mode_vote=true,song_vote=true;net::GameMode mode=net::GameMode::ffa;std::uint8_t song_count=3;std::string force_song;};
-struct RuntimeSettings {bool mode_vote=true,song_vote=true;net::GameMode mode=net::GameMode::ffa;std::uint8_t song_count=3;std::string force_song;std::uint8_t team_count=2;bool friendly_fire=false;};
+struct Config {std::string bind="0.0.0.0",map="games/bard_battle/assets/tiled_projects/maps/brawlers_ballad.tmx",songs_dir="games/bard_battle/assets/audio/songs";std::uint8_t team_count=2;bool friendly_fire=false,shield_freeze=true,mode_vote=true,song_vote=true;net::ShieldMeleeMode shield_melee=net::ShieldMeleeMode::stun;net::GameMode mode=net::GameMode::ffa;std::uint8_t song_count=3;std::string force_song;};
+struct RuntimeSettings {bool mode_vote=true,song_vote=true;net::GameMode mode=net::GameMode::ffa;std::uint8_t song_count=3;std::string force_song;std::uint8_t team_count=2;bool friendly_fire=false,shield_freeze=true;net::ShieldMeleeMode shield_melee=net::ShieldMeleeMode::stun;};
 struct RoundConfig {bool mode_vote=true,song_vote=true;net::GameMode mode=net::GameMode::ffa;std::uint8_t song_count=3;std::string force_song;std::vector<std::string> songs;};
 Config parse_startup(int argc,char **argv);
 RoundConfig defaults_for(const Config &,std::size_t catalog_size);

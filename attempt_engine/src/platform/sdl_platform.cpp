@@ -94,6 +94,7 @@ InputState SdlPlatform::poll_input() {
             if (event.key.key == SDLK_HOME) input.home_pressed = true;
             if (event.key.key == SDLK_END) input.end_pressed = true;
             if (event.key.key == SDLK_TAB && !event.key.repeat) input.tab_pressed = true;
+            if (event.key.key == SDLK_SPACE && !event.key.repeat) input.space_pressed = true;
             if (event.key.key == SDLK_A || event.key.key == SDLK_LEFT) {
                 input.move_left = true;
             }

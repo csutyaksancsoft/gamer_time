@@ -10,10 +10,11 @@
 
 namespace net {
 
-constexpr std::uint32_t kProtocolVersion = 8;
+constexpr std::uint32_t kProtocolVersion = 9;
 constexpr std::size_t kMaxSongCandidates = 8;
 constexpr std::size_t kMaxRhythmNotes = 4096;
 constexpr std::size_t kMaxProjectiles = 1024;
+constexpr std::size_t kMaxMeleeEffects = 256;
 constexpr std::uint16_t kServerPort = 27020;
 constexpr std::size_t kMaxPlayers = 64;
 constexpr float kMoveSpeed = 160.0f;
@@ -46,7 +47,8 @@ constexpr TeamId kNoTeam = 0;
 constexpr TeamId kFirstTeam = 1;
 constexpr TeamId kMaxTeam = 4;
 enum class RhythmGrade : std::uint8_t { perfect, good, miss };
-enum class RhythmAction : std::uint8_t { shoot, shield };
+enum class RhythmAction : std::uint8_t { shoot, shield, melee };
+enum class ShieldMeleeMode : std::uint8_t { stun, kill };
 enum class SoundCue : std::uint8_t { death, shot_success, shot_failure, shot_hit_player, shot_hit_shield, shield_success, shield_failure };
 
 struct PlayerState {
@@ -61,6 +63,7 @@ struct PlayerState {
     std::uint64_t respawn_at_us = 0;
     std::uint64_t protected_until_us = 0;
     std::uint64_t shield_until_us = 0;
+    std::uint64_t stunned_until_us = 0;
     TeamId team = kNoTeam;
     VoteChoice vote = VoteChoice::none;
     std::uint8_t song_vote = 0xff;
@@ -78,11 +81,20 @@ struct ProjectileState {
     float angle = 0.0f;
 };
 
+struct MeleeEffectState {
+    std::uint32_t id = 0;
+    PlayerId owner_id = 0;
+    Vec2f position{};
+    float radius = 0.0f;
+    std::uint64_t expires_at_us = 0;
+};
+
 struct Snapshot {
     std::uint64_t server_time_us = 0;
     std::uint32_t server_tick = 0;
     std::vector<PlayerState> players;
     std::vector<ProjectileState> projectiles;
+    std::vector<MeleeEffectState> melee_effects;
     RoomState room = RoomState::lobby;
     GameMode mode = GameMode::ffa;
     std::uint64_t vote_deadline_us = 0;
@@ -91,6 +103,8 @@ struct Snapshot {
     std::uint8_t ffa_votes = 0;
     std::uint8_t team_count = 2;
     bool friendly_fire = false;
+    bool shield_freeze = true;
+    ShieldMeleeMode shield_melee = ShieldMeleeMode::stun;
     bool mode_vote_enabled = false;
     bool song_vote_enabled = false;
     std::vector<std::string> song_candidates;
@@ -122,6 +136,7 @@ struct RhythmResult {
     bool overstrum = false;
     bool shot_fired = false;
     bool shield_activated = false;
+    bool melee_fired = false;
 };
 
 struct SoundEvent {

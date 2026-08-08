@@ -11,6 +11,7 @@ struct InputState {
     bool toggle_ui_debug_pressed = false;
     bool left_mouse_pressed = false;
     bool right_mouse_pressed = false;
+    bool space_pressed = false;
     bool tab_held = false;
     bool enter_pressed = false;
     bool backspace_pressed = false;

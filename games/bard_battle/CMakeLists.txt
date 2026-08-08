@@ -39,6 +39,11 @@ if(BUILD_TESTING)
     target_link_libraries(bard_battle_match_ui_tests PRIVATE bard_battle_match bard_battle_net)
     add_test(NAME bard_battle_match_ui COMMAND bard_battle_match_ui_tests)
 
+    add_executable(bard_battle_combat_rules_tests tests/combat_rules_tests.cpp)
+    bard_battle_target(bard_battle_combat_rules_tests)
+    target_link_libraries(bard_battle_combat_rules_tests PRIVATE bard_battle_net attempt_engine_core)
+    add_test(NAME bard_battle_combat_rules COMMAND bard_battle_combat_rules_tests)
+
     foreach(test_name IN ITEMS server_config headless_server)
         add_executable(bard_battle_${test_name}_tests tests/${test_name}_tests.cpp src/server/server_config.cpp)
         bard_battle_target(bard_battle_${test_name}_tests)
