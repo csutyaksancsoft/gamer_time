@@ -14,7 +14,8 @@ void ModeVote::begin(std::span<const net::PlayerId> players, std::uint64_t now) 
 bool ModeVote::submit(net::PlayerId id, net::VoteChoice choice) {
     if (!active_ || (choice != net::VoteChoice::teams && choice != net::VoteChoice::ffa)) return false;
     const auto found = voters_.find(id);
-    if (found == voters_.end() || found->second != net::VoteChoice::none) return false;
+    if (found == voters_.end()) return false;
+    if (found->second == choice) return true;
     found->second = choice;
     return true;
 }
