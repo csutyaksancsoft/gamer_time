@@ -63,6 +63,12 @@ Extract the ZIP and launch the client with a LAN server address and name:
 Add the real `assets\audio\song.wav` before packaging. Its BPM, first beat,
 subdivision, and duration are configured in `assets\audio\song.cfg`.
 
+Combat sound effects are populated by dropping WAV files into the folders under
+`assets/audio/sfx`: `death`, `shot_success`, `shot_failure`,
+`shot_hit_player`, `shot_hit_shield`, `shield_success`, and `shield_failure`.
+All WAV files in these folders are copied into packaged builds automatically;
+an empty folder is silent.
+
 ## Linux LAN server
 
 Install a C++ compiler, CMake, and curl. SDL, Vulkan, and Git are not required:

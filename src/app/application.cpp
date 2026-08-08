@@ -60,6 +60,7 @@ void Application::initialize() {
     } catch (const std::exception &) {
         // Networking and movement remain usable until the real song asset is supplied.
     }
+    effect_player_.load(config_.asset_dir + "/audio/sfx");
     network_.connect(config_.server, config_.player_name);
 
     initialized_ = true;
@@ -73,6 +74,7 @@ void Application::shutdown() {
     scene_renderer_.shutdown();
     network_.disconnect();
     song_player_.stop();
+    effect_player_.shutdown();
     platform_.shutdown();
 
     initialized_ = false;
@@ -98,6 +100,8 @@ void Application::tick_frame(float dt_seconds) {
     scene_renderer_.set_debug_modes(solid_terrain_debug_, true);
 
     network_.update();
+    net::SoundEvent sound_event{};
+    while(network_.take_sound_event(sound_event))effect_player_.play(sound_event.cue,predicted_position_,sound_event.position,sound_event.participant);
     const net::Snapshot & snapshot = network_.snapshot();
     if (!snapshot.players.empty()) {
         std::vector<NetworkUnitState> units;
@@ -160,6 +164,7 @@ void Application::tick_frame(float dt_seconds) {
         rhythm_hud_.schedule(schedule,local_start);
     }
     song_player_.update(rhythm_now_us);
+    effect_player_.update(rhythm_now_us);
     while(network_.take_rhythm_result(last_rhythm_result_)){have_rhythm_result_=true;rhythm_hud_.apply_result(last_rhythm_result_,rhythm_now_us);}
     fog_of_war_system_.update(world_);
     RenderWorld render_world = render_extractor_.build(
@@ -207,6 +212,7 @@ std::string Application::build_overlay_text() const {
     overlay << "Network: " << network_.status() << " | Player ID: " << network_.player_id() << '\n';
     overlay << "Server clock offset: " << network_.server_offset_us() / 1000 << " ms\n";
     overlay << "Audio: " << (song_player_.error().empty() ? "ready" : song_player_.error()) << '\n';
+    if(!effect_player_.diagnostic().empty())overlay<<"SFX: "<<effect_player_.diagnostic()<<'\n';
     if(have_rhythm_result_) overlay << "Last hit: " << net::grade_name(last_rhythm_result_.grade) << " (" << last_rhythm_result_.offset_ms << " ms) | "<<(last_rhythm_result_.shot_fired?"SHOT":last_rhythm_result_.shield_activated?"SHIELD":"NO ACTION")<<" | P/G/M " << last_rhythm_result_.perfect << "/" << last_rhythm_result_.good << "/" << last_rhythm_result_.miss << '\n';
     if(!local_alive_){const auto now=network_.server_time_us();const auto remaining=local_respawn_at_us_>now?local_respawn_at_us_-now:0;overlay<<"RESPAWNING IN "<<(remaining+999999)/1000000<<"\n";}
     const std::string rhythm_feedback=rhythm_hud_.feedback(net::monotonic_time_us());

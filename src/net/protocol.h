@@ -10,12 +10,13 @@
 
 namespace net {
 
-constexpr std::uint32_t kProtocolVersion = 5;
+constexpr std::uint32_t kProtocolVersion = 6;
 constexpr std::size_t kMaxRhythmNotes = 4096;
 constexpr std::size_t kMaxProjectiles = 1024;
 constexpr std::uint16_t kDefaultPort = 27020;
 constexpr std::size_t kMaxPlayers = 64;
 constexpr float kMoveSpeed = 160.0f;
+constexpr float kVisionRadius = 224.0f;
 
 using PlayerId = std::uint32_t;
 
@@ -30,11 +31,13 @@ enum class MessageType : std::uint8_t {
     song_schedule,
     rhythm_hit,
     rhythm_result,
+    sound_event,
 };
 
 enum class RoomState : std::uint8_t { lobby, countdown, playing, free_move };
 enum class RhythmGrade : std::uint8_t { perfect, good, miss };
 enum class RhythmAction : std::uint8_t { shoot, shield };
+enum class SoundCue : std::uint8_t { death, shot_success, shot_failure, shot_hit_player, shot_hit_shield, shield_success, shield_failure };
 
 struct PlayerState {
     PlayerId id = 0;
@@ -89,6 +92,16 @@ struct RhythmResult {
     bool shield_activated = false;
 };
 
+struct SoundEvent {
+    std::uint32_t id = 0;
+    SoundCue cue = SoundCue::death;
+    PlayerId source_id = 0;
+    PlayerId target_id = 0;
+    Vec2f position{};
+    std::uint64_t server_time_us = 0;
+    bool participant = false;
+};
+
 class Writer {
 public:
     explicit Writer(MessageType type);
@@ -137,6 +150,9 @@ SongSchedule read_song_schedule(Reader & reader);
 std::vector<std::uint8_t> make_rhythm_hit(std::uint32_t sequence, std::uint64_t client_time_us, std::int16_t calibration_ms, Vec2f aim, RhythmAction action);
 std::vector<std::uint8_t> make_rhythm_result(const RhythmResult & result);
 RhythmResult read_rhythm_result(Reader & reader);
+std::vector<std::uint8_t> make_sound_event(const SoundEvent & event);
+SoundEvent read_sound_event(Reader & reader);
+const char * sound_cue_name(SoundCue cue);
 
 std::uint64_t monotonic_time_us();
 const char * grade_name(RhythmGrade grade);

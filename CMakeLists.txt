@@ -91,6 +91,7 @@ if(GT_BUILD_CLIENT)
 
     add_library(gt_platform STATIC
         src/platform/camera_controller.cpp
+        src/platform/effect_player.cpp
         src/platform/sdl_platform.cpp
         src/platform/song_player.cpp
     )

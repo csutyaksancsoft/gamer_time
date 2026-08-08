@@ -8,6 +8,7 @@
 #include "net/client.h"
 #include "game/world.h"
 #include "platform/camera_controller.h"
+#include "platform/effect_player.h"
 #include "platform/sdl_platform.h"
 #include "platform/song_player.h"
 #include "rhythm/song_config.h"
@@ -43,6 +44,7 @@ private:
     World world_;
     net::Client network_;
     SongPlayer song_player_;
+    EffectPlayer effect_player_;
     SongConfig song_config_{};
     RhythmHud rhythm_hud_;
     FogOfWarSystem fog_of_war_system_;

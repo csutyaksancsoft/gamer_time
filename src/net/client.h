@@ -30,6 +30,7 @@ public:
     std::uint64_t server_time_us() const { return static_cast<std::uint64_t>(static_cast<std::int64_t>(monotonic_time_us()) + server_offset_us_); }
     bool take_song_schedule(SongSchedule & schedule);
     bool take_rhythm_result(RhythmResult & result);
+    bool take_sound_event(SoundEvent & event);
     const std::string & status() const { return status_; }
 
 private:
@@ -51,6 +52,8 @@ private:
     bool has_schedule_ = false;
     SongSchedule schedule_{};
     std::deque<RhythmResult> rhythm_results_;
+    std::deque<SoundEvent> sound_events_;
+    std::uint32_t last_sound_event_id_ = 0;
     std::string name_;
     ENetAddress address_{};
     std::uint64_t reconnect_deadline_us_ = 0;

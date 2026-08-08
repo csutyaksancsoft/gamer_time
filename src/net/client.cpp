@@ -59,7 +59,7 @@ void Client::begin_connection() {
 void Client::disconnect() {
     if (peer_) enet_peer_disconnect_now(peer_, 0);
     if (host_) enet_host_destroy(host_);
-    host_ = nullptr; peer_ = nullptr; connected_ = false; player_id_ = 0;
+    host_ = nullptr; peer_ = nullptr; connected_ = false; player_id_ = 0;last_sound_event_id_=0;sound_events_.clear();rhythm_results_.clear();
     if (enet_initialized_) { release_enet(); enet_initialized_ = false; }
 }
 
@@ -104,6 +104,7 @@ void Client::receive(std::span<const std::uint8_t> bytes) {
     }
     case MessageType::song_schedule: schedule_ = read_song_schedule(reader); has_schedule_ = true; break;
     case MessageType::rhythm_result: rhythm_results_.push_back(read_rhythm_result(reader)); break;
+    case MessageType::sound_event:{const auto event=read_sound_event(reader);if(event.id>last_sound_event_id_){last_sound_event_id_=event.id;sound_events_.push_back(event);}break;}
     default: break;
     }
 }
@@ -112,5 +113,6 @@ void Client::send_input(std::int8_t x, std::int8_t y) { send(make_input(++input_
 void Client::send_rhythm_hit(std::int16_t calibration_ms, Vec2f aim, RhythmAction action) { send(make_rhythm_hit(++rhythm_sequence_, server_time_us(), calibration_ms, aim, action), true); }
 bool Client::take_song_schedule(SongSchedule & schedule) { if(!has_schedule_) return false; schedule=schedule_; has_schedule_=false; return true; }
 bool Client::take_rhythm_result(RhythmResult & result) { if(rhythm_results_.empty()) return false; result=rhythm_results_.front(); rhythm_results_.pop_front(); return true; }
+bool Client::take_sound_event(SoundEvent & event){if(sound_events_.empty())return false;event=sound_events_.front();sound_events_.pop_front();return true;}
 
 } // namespace net
