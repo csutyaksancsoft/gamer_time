@@ -21,7 +21,7 @@ bool ModeVote::submit(net::PlayerId id, net::VoteChoice choice) {
 
 void ModeVote::disconnect(net::PlayerId id) { voters_.erase(id); }
 bool ModeVote::complete(std::uint64_t now) const {
-    return active_ && (now >= deadline_us_ || std::all_of(voters_.begin(), voters_.end(), [](const auto & item) { return item.second != net::VoteChoice::none; }));
+    return active_ && now >= deadline_us_;
 }
 net::GameMode ModeVote::result() const { return teams_count() > ffa_count() ? net::GameMode::teams : net::GameMode::ffa; }
 std::uint8_t ModeVote::eligible_count() const { return static_cast<std::uint8_t>(voters_.size()); }

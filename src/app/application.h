@@ -88,4 +88,6 @@ private:
     std::uint64_t menu_connect_started_us_ = 0;
     std::size_t name_cursor_ = 0;
     std::size_t server_cursor_ = 0;
+    net::VoteChoice pending_vote_ = net::VoteChoice::none;
+    net::TeamId pending_team_ = net::kNoTeam;
 };

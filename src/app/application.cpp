@@ -189,10 +189,23 @@ void Application::tick_frame(float dt_seconds) {
     }
     const std::uint64_t rhythm_now_us=net::monotonic_time_us();
     const bool voting=snapshot.room==net::RoomState::voting;
-    ui::DrawList match_ui=build_match_ui(input.window_width,input.window_height,input.tab_held);if(ui_debug_visible_)append_ui_debug(match_ui);
+    const auto local_player=std::find_if(snapshot.players.begin(),snapshot.players.end(),[&](const auto&p){return p.id==network_.player_id();});
+    if(local_player!=snapshot.players.end()){if(local_player->vote!=net::VoteChoice::none)pending_vote_=net::VoteChoice::none;if(pending_team_!=net::kNoTeam&&local_player->team==pending_team_)pending_team_=net::kNoTeam;}
+    ui::DrawList match_ui=build_match_ui(input.window_width,input.window_height,input.tab_held);
+    const net::VoteChoice accepted_vote=local_player==snapshot.players.end()?net::VoteChoice::none:local_player->vote;
+    const net::TeamId accepted_team=local_player==snapshot.players.end()?net::kNoTeam:local_player->team;
+    for(auto&hit:match_ui.hits){
+        const bool teams_vote=hit.action==ui::Action::vote_teams,ffa_vote=hit.action==ui::Action::vote_ffa;
+        const bool vote_selected=(teams_vote&&(accepted_vote==net::VoteChoice::teams||pending_vote_==net::VoteChoice::teams))||(ffa_vote&&(accepted_vote==net::VoteChoice::ffa||pending_vote_==net::VoteChoice::ffa));
+        if((teams_vote||ffa_vote)&&(accepted_vote!=net::VoteChoice::none||pending_vote_!=net::VoteChoice::none))hit.enabled=false;
+        net::TeamId button_team=net::kNoTeam;if(hit.action>=ui::Action::team_red&&hit.action<=ui::Action::team_gold)button_team=static_cast<net::TeamId>(static_cast<int>(hit.action)-static_cast<int>(ui::Action::team_red)+1);
+        const bool team_selected=button_team!=net::kNoTeam&&(button_team==accepted_team||button_team==pending_team_);
+        if(vote_selected||team_selected){const ui::Rect mark{hit.bounds.x+4,hit.bounds.y+4,hit.bounds.width-8,hit.bounds.height-8};match_ui.quads.push_back({mark,0,{1,1,1,0.24f},false});match_ui.text.push_back({pending_vote_!=net::VoteChoice::none||pending_team_!=net::kNoTeam?"SENT":"SELECTED",{mark.x,mark.y+mark.height-21,mark.width,18},1.1f,{1,1,1,1},ui::Align::center,true});}
+    }
+    if(ui_debug_visible_)append_ui_debug(match_ui);
     const ui::Action action=clicked_action(match_ui,input);
     bool ui_consumed=false;
-    if(action==ui::Action::vote_teams){network_.request_vote(net::VoteChoice::teams);ui_consumed=true;}else if(action==ui::Action::vote_ffa){network_.request_vote(net::VoteChoice::ffa);ui_consumed=true;}else if(action>=ui::Action::team_red&&action<=ui::Action::team_gold){network_.request_team(static_cast<net::TeamId>(static_cast<int>(action)-static_cast<int>(ui::Action::team_red)+1));ui_consumed=true;}
+    if(action==ui::Action::vote_teams){network_.request_vote(net::VoteChoice::teams);pending_vote_=net::VoteChoice::teams;ui_consumed=true;}else if(action==ui::Action::vote_ffa){network_.request_vote(net::VoteChoice::ffa);pending_vote_=net::VoteChoice::ffa;ui_consumed=true;}else if(action>=ui::Action::team_red&&action<=ui::Action::team_gold){pending_team_=static_cast<net::TeamId>(static_cast<int>(action)-static_cast<int>(ui::Action::team_red)+1);network_.request_team(pending_team_);ui_consumed=true;}
     if(input.left_mouse_pressed&&!ui_consumed&&local_alive_){const Vec2f target=screen_to_world(input.mouse_x,input.mouse_y,input.window_width,input.window_height,camera_controller_.state());const Vec2f aim=normalize_or_zero(target-predicted_position_);rhythm_hud_.predict_hit(rhythm_now_us,config_.calibration_ms);network_.send_rhythm_hit(config_.calibration_ms,aim,net::RhythmAction::shoot);}
     else if(input.right_mouse_pressed&&local_alive_){rhythm_hud_.predict_hit(rhythm_now_us,config_.calibration_ms);network_.send_rhythm_hit(config_.calibration_ms,{},net::RhythmAction::shield);}
     net::SongSchedule schedule{};
