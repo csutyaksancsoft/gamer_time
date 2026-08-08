@@ -37,7 +37,6 @@ private:
     void initialize();
     void shutdown();
     void tick_frame(float dt_seconds);
-    void update_window_title(const RenderBatch & batch) const;
     std::string build_overlay_text() const;
     std::string build_menu_text() const;
     std::string build_scoreboard_text() const;
@@ -64,7 +63,7 @@ private:
     SceneRenderer scene_renderer_;
     bool running_ = false;
     bool initialized_ = false;
-    bool show_collision_debug_ = true;
+    bool show_collision_debug_ = false;
     bool solid_terrain_debug_ = false;
     bool overlay_text_visible_ = false;
     AtlasAsset scene_atlas_;
