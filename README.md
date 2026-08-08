@@ -57,11 +57,16 @@ build-windows\gamer-time-windows-x64.zip
 Extract the ZIP and launch the client with a LAN server address and name:
 
 ```powershell
-.\gamer_time.exe --server 192.168.1.10:27020 --name YourName
+.\gamer_time.exe --server 192.168.1.10 --name YourName
 ```
 
-Add the real `assets\audio\song.wav` before packaging. Its BPM, first beat,
-subdivision, and duration are configured in `assets\audio\song.cfg`.
+Gamer Time always uses UDP port `27020`. Players enter only the server IP;
+the client supplies the port automatically.
+
+Songs live in `assets/audio/songs/*.cfg`; each config has a unique `id` and a
+WAV path relative to that config. Server and client distributions must contain
+matching song IDs and audio assets. A missing scheduled ID is reported by the
+client and never falls back to a different track.
 
 Combat sound effects are populated by dropping WAV files into the folders under
 `assets/audio/sfx`: `death`, `shot_success`, `shot_failure`,
@@ -78,8 +83,33 @@ bash scripts/build-server.sh
 bash scripts/run-lan-server.sh
 ```
 
-The server terminal accepts `status`, `start`, `stop`, `kick ID`, and `quit`.
-`start` schedules the shared song three seconds in the future.
+The server terminal accepts `status`, `songs`, `start [options]`, `stop`,
+`kick ID`, `help`, and `quit`. Run `gamer_time_server --help` for validation
+rules and examples. Common launches:
+
+```bash
+./build-server/gamer_time_server --songs-dir assets/audio/songs
+```
+
+Configure gameplay from the live server console without restarting:
+
+```text
+set mode-vote off
+set mode teams
+set song-count 5
+set force-song main
+set force-song off
+```
+
+Mode and song voting default to on, with three shuffled song candidates.
+Options on `start` affect one successful round only:
+
+```text
+start --no-mode-vote --mode teams
+start --no-song-vote --force-song main
+start --song-vote --song-count 5
+start --mode-vote --song-vote --songs a,b,c
+```
 
 ## Automatic BPM and beat-offset detection
 
@@ -89,10 +119,11 @@ Install the offline analyzer once:
 python -m pip install essentia
 ```
 
-Then analyze a song and update `assets/audio/song.cfg` automatically:
+Keep each WAV beside its catalog config under `assets/audio/songs`, then analyze
+it by passing both paths explicitly:
 
 ```bash
-python detect_bpm.py --wav MEMECAR-001.wav
+python detect_bpm.py --wav songs/MEMECAR-001.wav --config assets/audio/songs/main.cfg
 ```
 
 Use `--dry-run` to inspect the detected BPM, first-beat offset, duration, and
@@ -102,7 +133,7 @@ half/double-tempo results into the 90–180 BPM gameplay range by default.
 Run protocol/load-test clients from another terminal:
 
 ```bash
-./build-server/gamer_time_bot --server 127.0.0.1:27020 --count 64
+./build-server/gamer_time_bot --server 127.0.0.1 --count 64
 ```
 
 ### Script options

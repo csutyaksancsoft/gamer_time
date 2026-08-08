@@ -17,7 +17,7 @@ enum class Align : std::uint8_t { left, center, right };
 enum class Image : std::uint8_t { none, menu, scoreboard };
 struct ScreenQuad { Rect bounds{}; std::uint16_t sprite=0; Color color{}; bool use_atlas=true; Image image=Image::none; };
 struct TextRun { std::string text; Rect bounds{}; float scale=1; Color color{}; Align alignment=Align::left; bool clip=true; };
-enum class Action : std::uint8_t { none, focus_name, focus_server, connect, vote_teams, vote_ffa, team_red, team_blue, team_green, team_gold };
+enum class Action : std::uint8_t { none, focus_name, focus_server, connect, vote_teams, vote_ffa, song_1, song_2, song_3, song_4, song_5, song_6, song_7, song_8, team_red, team_blue, team_green, team_gold };
 struct HitRegion { Rect bounds{}; Action action=Action::none; bool enabled=true; };
 struct DrawList { std::vector<ScreenQuad> quads; std::vector<TextRun> text; std::vector<HitRegion> hits; void clear(){quads.clear();text.clear();hits.clear();} };
 

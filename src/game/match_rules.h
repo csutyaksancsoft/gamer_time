@@ -6,6 +6,8 @@
 #include <span>
 #include <unordered_map>
 #include <vector>
+#include <random>
+#include <string>
 
 namespace game {
 
@@ -35,6 +37,7 @@ private:
     std::uint64_t deadline_us_ = 0;
     std::unordered_map<net::PlayerId, net::VoteChoice> voters_;
 };
+class SongVote {public:void begin(std::span<const net::PlayerId>,std::span<const std::string> candidates,std::uint64_t now);bool submit(net::PlayerId,std::uint8_t);void disconnect(net::PlayerId);bool complete(std::uint64_t now)const{return active_&&now>=deadline_us_;}std::string result(std::mt19937&)const;std::uint8_t choice(net::PlayerId)const;std::vector<std::uint8_t> totals()const;bool active()const{return active_;}std::uint64_t deadline_us()const{return deadline_us_;}std::uint8_t eligible_count()const{return static_cast<std::uint8_t>(voters_.size());}void finish(){active_=false;}private:bool active_=false;std::uint64_t deadline_us_=0;std::vector<std::string> candidates_;std::unordered_map<net::PlayerId,std::uint8_t> voters_;};
 
 bool projectile_can_hit(net::GameMode mode, bool friendly_fire, net::TeamId owner_team, net::TeamId target_team);
 bool kill_is_awarded(net::GameMode mode, net::TeamId killer_team, net::TeamId victim_team);

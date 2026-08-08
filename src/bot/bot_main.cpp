@@ -8,7 +8,7 @@
 #include <vector>
 
 int main(int argc,char ** argv) try {
-    std::string server="127.0.0.1:27020";std::size_t count=1;
+    std::string server="127.0.0.1";std::size_t count=1;
     for(int i=1;i<argc;++i){const std::string arg=argv[i];if(arg=="--server"&&i+1<argc)server=argv[++i];else if(arg=="--count"&&i+1<argc)count=std::stoul(argv[++i]);}
     count=std::min(count,net::kMaxPlayers);std::vector<std::unique_ptr<net::Client>> clients;
     for(std::size_t i=0;i<count;++i){auto client=std::make_unique<net::Client>();client->connect(server,"Bot-"+std::to_string(i+1));clients.push_back(std::move(client));}

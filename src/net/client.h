@@ -20,6 +20,7 @@ public:
     void send_input(std::int8_t x, std::int8_t y);
     void send_rhythm_hit(std::int16_t calibration_ms, Vec2f aim, RhythmAction action);
     void request_vote(VoteChoice choice);
+    void request_song_vote(std::uint8_t candidate);
     void request_team(TeamId team);
 
     bool connected() const { return connected_; }

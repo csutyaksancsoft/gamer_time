@@ -10,10 +10,11 @@
 
 namespace net {
 
-constexpr std::uint32_t kProtocolVersion = 7;
+constexpr std::uint32_t kProtocolVersion = 8;
+constexpr std::size_t kMaxSongCandidates = 8;
 constexpr std::size_t kMaxRhythmNotes = 4096;
 constexpr std::size_t kMaxProjectiles = 1024;
-constexpr std::uint16_t kDefaultPort = 27020;
+constexpr std::uint16_t kServerPort = 27020;
 constexpr std::size_t kMaxPlayers = 64;
 constexpr float kMoveSpeed = 160.0f;
 constexpr float kVisionRadius = 224.0f;
@@ -34,6 +35,7 @@ enum class MessageType : std::uint8_t {
     sound_event,
     vote_request,
     team_request,
+    song_vote_request,
 };
 
 enum class RoomState : std::uint8_t { lobby, voting, countdown, playing, free_move };
@@ -61,6 +63,7 @@ struct PlayerState {
     std::uint64_t shield_until_us = 0;
     TeamId team = kNoTeam;
     VoteChoice vote = VoteChoice::none;
+    std::uint8_t song_vote = 0xff;
     std::uint32_t round_kills = 0;
     std::uint32_t round_deaths = 0;
     std::uint32_t session_kills = 0;
@@ -88,6 +91,11 @@ struct Snapshot {
     std::uint8_t ffa_votes = 0;
     std::uint8_t team_count = 2;
     bool friendly_fire = false;
+    bool mode_vote_enabled = false;
+    bool song_vote_enabled = false;
+    std::vector<std::string> song_candidates;
+    std::vector<std::uint8_t> song_votes;
+    std::string selected_song_id;
 };
 
 struct SongSchedule {
@@ -98,6 +106,8 @@ struct SongSchedule {
     std::uint16_t subdivision = 1;
     std::string song_id;
     std::vector<std::uint32_t> note_times_ms;
+    // Server console status only; not serialized.
+    std::uint64_t vote_deadline_us = 0;
 };
 
 struct RhythmResult {
@@ -176,6 +186,8 @@ std::vector<std::uint8_t> make_sound_event(const SoundEvent & event);
 SoundEvent read_sound_event(Reader & reader);
 std::vector<std::uint8_t> make_vote_request(VoteChoice choice);
 VoteChoice read_vote_request(Reader & reader);
+std::vector<std::uint8_t> make_song_vote_request(std::uint8_t candidate);
+std::uint8_t read_song_vote_request(Reader & reader);
 std::vector<std::uint8_t> make_team_request(TeamId team);
 TeamId read_team_request(Reader & reader);
 bool valid_team(TeamId team, std::uint8_t team_count);

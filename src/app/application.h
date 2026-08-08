@@ -24,6 +24,7 @@
 
 #include <chrono>
 #include <string>
+#include <optional>
 
 class Application {
 public:
@@ -52,7 +53,7 @@ private:
     net::Client network_;
     SongPlayer song_player_;
     EffectPlayer effect_player_;
-    SongConfig song_config_{};
+    std::optional<SongCatalog> song_catalog_;
     RhythmHud rhythm_hud_;
     FogOfWarSystem fog_of_war_system_;
     RenderExtractor render_extractor_;
@@ -89,5 +90,6 @@ private:
     std::size_t name_cursor_ = 0;
     std::size_t server_cursor_ = 0;
     net::VoteChoice pending_vote_ = net::VoteChoice::none;
+    std::uint8_t pending_song_vote_ = 0xff;
     net::TeamId pending_team_ = net::kNoTeam;
 };

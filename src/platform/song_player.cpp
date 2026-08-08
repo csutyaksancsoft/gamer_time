@@ -1,13 +1,14 @@
 #include "platform/song_player.h"
 
 #include <SDL3/SDL.h>
+#include <filesystem>
 
 SongPlayer::~SongPlayer() { stop(); }
 
 bool SongPlayer::load(const std::string & directory, const SongConfig & config) {
     stop(); error_.clear();
     Uint8 * data=nullptr; Uint32 length=0;
-    const std::string path=directory + "/" + config.file;
+    const std::string path=std::filesystem::path(config.file).is_absolute()?config.file:(std::filesystem::path(directory)/config.file).string();
     if (!SDL_LoadWAV(path.c_str(), &spec_, &data, &length)) { error_="Cannot load " + path + ": " + SDL_GetError(); return false; }
     pcm_.assign(data, data + length); SDL_free(data);
     stream_=SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec_, nullptr, nullptr);

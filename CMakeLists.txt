@@ -46,7 +46,7 @@ add_library(gt_map STATIC
 gt_configure_target(gt_map)
 target_link_libraries(gt_map PUBLIC gt_core)
 
-    add_library(gt_rhythm STATIC src/rhythm/song_config.cpp)
+add_library(gt_rhythm STATIC src/rhythm/song_config.cpp)
 gt_configure_target(gt_rhythm)
 target_link_libraries(gt_rhythm PUBLIC gt_core)
 
@@ -71,10 +71,18 @@ if(BUILD_TESTING)
     gt_configure_target(gt_match_ui_tests)
     target_link_libraries(gt_match_ui_tests PRIVATE gt_match gt_net)
     add_test(NAME match_ui COMMAND gt_match_ui_tests)
+    add_executable(gt_server_config_tests tests/server_config_tests.cpp src/server/server_config.cpp)
+    gt_configure_target(gt_server_config_tests)
+    target_link_libraries(gt_server_config_tests PRIVATE gt_rhythm gt_net)
+    add_test(NAME server_config COMMAND gt_server_config_tests)
+    add_executable(gt_headless_server_tests tests/headless_server_tests.cpp src/server/server_config.cpp)
+    gt_configure_target(gt_headless_server_tests)
+    target_link_libraries(gt_headless_server_tests PRIVATE gt_match gt_rhythm gt_net)
+    add_test(NAME headless_server_rounds COMMAND gt_headless_server_tests)
 endif()
 
 if(GT_BUILD_SERVER)
-    add_executable(gamer_time_server src/server/server_main.cpp)
+    add_executable(gamer_time_server src/server/server_main.cpp src/server/server_config.cpp)
     gt_configure_target(gamer_time_server)
     target_link_libraries(gamer_time_server PRIVATE gt_map gt_net gt_rhythm gt_match enet)
 
