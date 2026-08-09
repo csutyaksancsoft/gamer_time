@@ -1,0 +1,108 @@
+#pragma once
+
+#include "core/types.h"
+#include "game/components.h"
+#include "game/map_world.h"
+#include "platform/camera_controller.h"
+
+#include <cstdint>
+#include <string>
+#include <vector>
+
+constexpr std::uint32_t kInstanceFlagSelected = 1u << 0;
+constexpr std::uint32_t kInstanceFlagDebugCollision = 1u << 1;
+constexpr std::uint32_t kInstanceFlagIgnoreFog = 1u << 2;
+constexpr std::uint32_t kInstanceFlagTerrain = 1u << 3;
+constexpr std::uint32_t kInstanceFlagScreenSpace = 1u << 4;
+constexpr std::uint32_t kInstanceFlagSolidColor = 1u << 5;
+constexpr std::uint32_t kInstanceFlagCircleOutline = 1u << 6;
+constexpr std::uint32_t kInstanceFlagMenuImage = 1u << 7;
+constexpr std::uint32_t kInstanceFlagScoreboardImage = 1u << 8;
+constexpr std::uint32_t kInstanceFlagTmxFlipHorizontal = 1u << 16;
+constexpr std::uint32_t kInstanceFlagTmxFlipVertical = 1u << 17;
+constexpr std::uint32_t kInstanceFlagTmxFlipDiagonal = 1u << 18;
+
+struct RenderUnit {
+    UnitId id = 0;
+    Vec2f world_pos{};
+    Vec2f size{24.0f, 24.0f};
+    std::uint32_t sprite_index = 0;
+    std::uint32_t atlas_span = 0x00010001u;
+    bool visible_in_fog = true;
+    bool selected = false;
+    float rotation_radians = 0.0f;
+    bool solid_color = false;
+    bool circle_outline = false;
+    float color[4]{1.0f,1.0f,1.0f,1.0f};
+    float opacity = 1.0f;
+    std::uint32_t transform_flags = 0;
+    std::uint64_t stable_order = 0;
+};
+
+struct RenderTile {
+    Vec2f world_pos{};
+    Vec2f size{24.0f, 24.0f};
+    std::uint32_t atlas_index = 0;
+    std::uint32_t transform_flags = 0;
+};
+
+struct RenderTileLayer {
+    std::string name;
+    bool visible = true;
+    bool renderable = true;
+    float opacity = 1.0f;
+    TileRenderPhase render_phase = TileRenderPhase::BelowUnits;
+    std::vector<RenderTile> tiles;
+};
+
+struct RenderTileLayerRange {
+    std::uint32_t instance_offset = 0;
+    std::uint32_t instance_count = 0;
+    float opacity = 1.0f;
+    TileRenderPhase render_phase = TileRenderPhase::BelowUnits;
+};
+
+struct ProjectedUnit {
+    RenderUnit source{};
+    Vec2f screen_pos{};
+    float depth_key = 0.0f;
+};
+
+struct RenderDebugQuad {
+    Vec2f world_pos{};
+    Vec2f size{};
+    float rotation_radians = 0.0f;
+    std::uint32_t flags = 0;
+    float opacity = 1.0f;
+};
+
+struct InstanceData {
+    Vec2f world_pos{};
+    Vec2f size{24.0f, 24.0f};
+    std::uint32_t sprite_index = 0;
+    std::uint32_t atlas_span = 0x00010001u;
+    std::uint32_t flags = 0;
+    float opacity = 1.0f;
+    float rotation_radians = 0.0f;
+    float color[4]{1.0f, 1.0f, 1.0f, 1.0f};
+};
+
+struct RenderBatch {
+    std::vector<InstanceData> instances;
+    std::vector<RenderTileLayerRange> terrain_layer_ranges;
+    std::uint32_t terrain_instance_offset = 0;
+    std::uint32_t terrain_instance_count = 0;
+    std::uint32_t unit_instance_offset = 0;
+    std::uint32_t unit_instance_count = 0;
+    std::uint32_t debug_instance_offset = 0;
+    std::uint32_t debug_instance_count = 0;
+};
+
+struct RenderWorld {
+    CameraState camera{};
+    std::vector<RenderTileLayer> terrain_layers;
+    std::vector<RenderUnit> units;
+    std::vector<ProjectedUnit> projected_units;
+    std::vector<RenderDebugQuad> debug_quads;
+    std::string overlay_text;
+};

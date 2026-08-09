@@ -1,0 +1,102 @@
+#pragma once
+
+#include "assets/image_loader.h"
+#include "gpu/buffer_utils.h"
+#include "gpu/texture_utils.h"
+#include "gpu/vulkan_context.h"
+#include "render/render_world.h"
+
+#include <cstdint>
+#include <array>
+#include <span>
+#include <string>
+#include <vector>
+
+namespace gpu {
+
+struct FrameInstanceBuffer {
+    BufferAllocation allocation{};
+    VkDeviceSize capacity_bytes = 0;
+    VkDeviceSize uploaded_bytes = 0;
+    std::uint64_t reallocation_count = 0;
+};
+
+class GpuResources {
+public:
+    void initialize(VulkanContext & context);
+    void shutdown();
+    void reset();
+
+    void bind_text_overlay_resources(
+        VkImage font_atlas_image,
+        VkImageView font_atlas_view,
+        VkSampler font_atlas_sampler,
+        VkBuffer text_vertex_buffer
+    );
+
+    void upload_instance_data(std::span<const InstanceData> instances);
+    bool upload_instance_data_for_frame(std::size_t frame_index, std::string & diagnostic);
+    void upload_fog_mask(std::span<const std::uint8_t> fog_mask, std::uint32_t width, std::uint32_t height);
+    void upload_scene_atlas(const LoadedImage & image);
+    void upload_menu_image(const LoadedImage & image);
+    void upload_scoreboard_image(const LoadedImage & image);
+
+    const BufferAllocation & static_quad_vertex_buffer() const { return static_quad_vertex_buffer_; }
+    const BufferAllocation & static_quad_index_buffer() const { return static_quad_index_buffer_; }
+    const BufferAllocation & instance_buffer(std::size_t frame_index) const { return frame_instance_buffers_.at(frame_index).allocation; }
+    const FrameInstanceBuffer & frame_instance_buffer(std::size_t frame_index) const { return frame_instance_buffers_.at(frame_index); }
+    const TextureAllocation & fog_texture() const { return fog_texture_; }
+    const TextureAllocation & scene_atlas_texture() const { return scene_atlas_texture_; }
+    const TextureAllocation & menu_texture() const { return menu_texture_; }
+    const TextureAllocation & scoreboard_texture() const { return scoreboard_texture_; }
+    const TextureAllocation & font_atlas_texture() const { return font_atlas_texture_; }
+    VkBuffer text_vertex_buffer() const { return text_vertex_buffer_; }
+
+    std::span<const InstanceData> staged_instances() const { return staged_instances_; }
+    std::span<const std::uint8_t> staged_fog_mask() const { return staged_fog_mask_; }
+
+private:
+    VulkanContext * context_ = nullptr;
+    VkCommandPool upload_command_pool_ = VK_NULL_HANDLE;
+    BufferAllocation static_quad_vertex_buffer_{};
+    BufferAllocation static_quad_index_buffer_{};
+    std::array<FrameInstanceBuffer, kMaxFramesInFlight> frame_instance_buffers_{};
+    TextureAllocation fog_texture_{};
+    TextureAllocation scene_atlas_texture_{};
+    TextureAllocation menu_texture_{};
+    TextureAllocation scoreboard_texture_{};
+    TextureAllocation font_atlas_texture_{};
+    VkBuffer text_vertex_buffer_ = VK_NULL_HANDLE;
+    std::vector<InstanceData> staged_instances_;
+    std::vector<std::uint8_t> staged_fog_mask_;
+
+    void create_upload_command_pool();
+    void create_static_quad_buffers();
+    bool ensure_instance_buffer_capacity(std::size_t frame_index, VkDeviceSize required_size, std::string & diagnostic);
+    void ensure_fog_texture(std::uint32_t width, std::uint32_t height);
+    void ensure_scene_atlas_texture(std::uint32_t width, std::uint32_t height);
+    void upload_ui_texture(TextureAllocation & texture, const LoadedImage & image);
+    void ensure_ui_texture(TextureAllocation & texture, std::uint32_t width, std::uint32_t height);
+    void destroy_buffer(BufferAllocation & allocation);
+    void destroy_texture(TextureAllocation & allocation);
+    uint32_t find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties) const;
+    BufferAllocation create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties) const;
+    TextureAllocation create_texture(
+        std::uint32_t width,
+        std::uint32_t height,
+        VkFormat format,
+        VkImageUsageFlags usage,
+        VkMemoryPropertyFlags properties
+    ) const;
+    VkImageView create_image_view(VkImage image, VkFormat format) const;
+    VkCommandBuffer begin_single_time_commands() const;
+    void end_single_time_commands(VkCommandBuffer command_buffer) const;
+    void transition_image_layout(VkImage image, VkFormat format, VkImageLayout old_layout, VkImageLayout new_layout) const;
+    void copy_buffer(VkBuffer src_buffer, VkBuffer dst_buffer, VkDeviceSize size) const;
+    void copy_buffer_to_image(VkBuffer buffer, VkImage image, std::uint32_t width, std::uint32_t height) const;
+    VkDevice device() const;
+    VkPhysicalDevice physical_device() const;
+    VkQueue graphics_queue() const;
+};
+
+} // namespace gpu

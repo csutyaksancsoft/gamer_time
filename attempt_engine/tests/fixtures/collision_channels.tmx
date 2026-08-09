@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map orientation="orthogonal" width="20" height="10" tilewidth="32" tileheight="32" infinite="0">
+ <tileset firstgid="1" source="collision_fixture.tsx"/>
+ <objectgroup id="1" name="collision_full" visible="0">
+  <object id="1" x="32" y="64" width="24" height="24"/>
+  <object id="2" x="64" y="64"><polygon points="0,0 24,0 12,24"/></object>
+  <object id="3" x="0" y="0"><point/></object>
+  <object id="4" x="0" y="0" width="0" height="12"/>
+ </objectgroup>
+ <objectgroup id="2" name="collision_shots">
+  <object id="5" x="160" y="64" width="24" height="24"/>
+  <object id="6" x="192" y="64"><polygon points="0,0 24,0 12,24"/></object>
+ </objectgroup>
+ <objectgroup id="3" name="collision_player">
+  <object id="7" x="288" y="64" width="24" height="24"/>
+  <object id="8" x="320" y="64"><polygon points="0,0 24,0 12,24"/></object>
+  <object id="9" x="352" y="64" gid="1" width="24" height="24"/>
+ </objectgroup>
+ <objectgroup id="4" name="collision">
+  <object id="10" x="416" y="64" width="24" height="24" type="collision"><properties><property name="engine.blocks_movement" type="bool" value="true"/></properties></object>
+ </objectgroup>
+ <objectgroup id="5" name="boundary"><properties><property name="engine.semantic" value="collision"/></properties>
+  <object id="11" x="448" y="64" width="24" height="24" name="collision"/>
+ </objectgroup>
+ <objectgroup id="6" name="Collision_Full"><object id="12" x="480" y="64" width="24" height="24"/></objectgroup>
+</map>

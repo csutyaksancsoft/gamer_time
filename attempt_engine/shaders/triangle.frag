@@ -1,0 +1,87 @@
+#version 450
+
+layout(push_constant) uniform ScenePushConstants {
+    vec2 cameraCenter;
+    vec2 viewportSize;
+    vec2 atlasGrid;
+    vec2 atlasTextureSize;
+    vec2 atlasTileSize;
+    vec2 fogSize;
+    float zoom;
+    uint solidTerrainDebug;
+    uint fogEnabled;
+} scene;
+
+layout(set = 0, binding = 0) uniform sampler2D uSceneAtlas;
+layout(set = 0, binding = 1) uniform sampler2D uFogMask;
+layout(set = 0, binding = 2) uniform sampler2D uMenuImage;
+layout(set = 0, binding = 3) uniform sampler2D uScoreboardImage;
+
+layout(location = 0) in vec2 vUv;
+layout(location = 1) in vec2 vWorldPos;
+layout(location = 2) flat in uint vSpriteIndex;
+layout(location = 3) flat in uint vFlags;
+layout(location = 4) in vec2 vAtlasUv;
+layout(location = 5) in float vOpacity;
+layout(location = 6) flat in vec4 vColor;
+layout(location = 0) out vec4 outColor;
+
+vec3 fallback_color(uint spriteIndex) {
+    float idx = float(spriteIndex % 7u);
+    return vec3(
+        0.30 + 0.10 * mod(idx + 0.0, 3.0),
+        0.45 + 0.10 * mod(idx + 1.0, 3.0),
+        0.25 + 0.12 * mod(idx + 2.0, 3.0)
+    );
+}
+
+void main() {
+    vec4 atlasColor = texture(uSceneAtlas, vAtlasUv);
+    if((vFlags&128u)!=0u)atlasColor=texture(uMenuImage,vUv);
+    if((vFlags&256u)!=0u)atlasColor=texture(uScoreboardImage,vUv);
+    vec3 color = atlasColor.rgb;
+    float alpha = atlasColor.a * clamp(vOpacity, 0.0, 1.0);
+
+    if ((vFlags & 32u) != 0u) {
+        color = vColor.rgb;
+        alpha = vColor.a * clamp(vOpacity, 0.0, 1.0);
+    }
+
+    if ((vFlags & 64u) != 0u) {
+        float radius = distance(vUv, vec2(0.5));
+        float ring = 1.0 - smoothstep(0.40, 0.48, radius);
+        ring *= smoothstep(0.31, 0.39, radius);
+        alpha *= ring;
+        if (alpha <= 0.001) discard;
+    }
+
+    if (scene.solidTerrainDebug != 0u && (vFlags & 8u) != 0u) {
+        color = fallback_color(vSpriteIndex);
+        alpha = clamp(vOpacity, 0.0, 1.0);
+    }
+
+    if ((vFlags & 2u) != 0u) {
+        color = vec3(1.0, 0.2, 0.2);
+        alpha = clamp(vOpacity, 0.0, 1.0);
+    }
+
+    if ((vFlags & 1u) != 0u) {
+        float highlight = smoothstep(0.15, 0.85, 1.0 - distance(vUv, vec2(0.5)));
+        color = mix(color, vec3(1.0, 0.9, 0.2), 0.35 * highlight);
+    }
+
+    if (scene.fogEnabled != 0u && (vFlags & 4u) == 0u) {
+        vec2 fogUv = (vWorldPos + scene.fogSize * 0.5) / max(scene.fogSize, vec2(1.0));
+        bool insideFogMask = all(greaterThanEqual(fogUv, vec2(0.0))) && all(lessThanEqual(fogUv, vec2(1.0)));
+        float fogValue = insideFogMask ? texture(uFogMask, fogUv).r : 0.0;
+        if ((vFlags & 8u) != 0u) {
+            // Keep the map readable under fog while clearly darkening unseen areas.
+            color *= mix(0.55, 1.0, fogValue);
+        } else {
+            // Dynamic world objects must not leak information through fog.
+            alpha *= fogValue;
+        }
+    }
+
+    outColor = vec4(color, alpha);
+}
