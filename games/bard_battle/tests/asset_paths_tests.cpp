@@ -3,6 +3,7 @@
 #include "game/map_world.h"
 #include "render/entity_animations.h"
 
+#include <array>
 #include <cassert>
 #include <string>
 
@@ -32,11 +33,17 @@ int main() {
     assert(animations.find_player(1, entity_animation::PlayerAnimation::death)->tsx_path.filename() == "death.tsx");
     assert(animations.find_player(1, entity_animation::PlayerAnimation::shield)->tsx_path.filename() == "shield.tsx");
     assert(animations.find_player(1, entity_animation::PlayerAnimation::shield_break)->tsx_path.filename() == "shield_break.tsx");
-    assert(animations.find_player(1, entity_animation::PlayerAnimation::running) == idle);
     const auto * melee = animations.find_player_exact(1, entity_animation::PlayerAnimation::melee);
     assert(melee && melee->tsx_path.filename() == "melee.tsx");
     assert(melee->world_size.x == 64.0f && melee->world_size.y == 64.0f);
-    assert(animations.find_player(2, entity_animation::PlayerAnimation::attack) == idle);
+    constexpr std::array states{
+        entity_animation::PlayerAnimation::death, entity_animation::PlayerAnimation::idle,
+        entity_animation::PlayerAnimation::running, entity_animation::PlayerAnimation::attack,
+        entity_animation::PlayerAnimation::melee, entity_animation::PlayerAnimation::shield_break,
+        entity_animation::PlayerAnimation::shield};
+    for(std::uint8_t player=1;player<=4;++player)for(const auto state:states)assert(animations.find_player_exact(player,state));
+    const auto * running=animations.find_player_exact(1,entity_animation::PlayerAnimation::running);
+    assert(running->frames.size()==3&&running->source_width==23&&running->source_height==28);
 
     auto runtime_atlas = assets::build_runtime_atlas(map_asset);
     assert(animations.pack(runtime_atlas.atlas, runtime_atlas.image).empty());
