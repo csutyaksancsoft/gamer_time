@@ -8,10 +8,12 @@
 #include <string>
 #include <vector>
 
+class AudioPlaybackDevice;
+
 class SongPlayer {
 public:
     ~SongPlayer();
-    bool load(const std::string & audio_directory, const SongConfig & config);
+    bool load(const AudioPlaybackDevice & device, const std::string & audio_directory, const SongConfig & config);
     void schedule(std::uint64_t local_start_us);
     void update(std::uint64_t now_us);
     void stop();
@@ -19,6 +21,7 @@ public:
     std::int64_t playhead_ms(std::uint64_t now_us) const;
     const std::string & error() const { return error_; }
 private:
+    SDL_AudioDeviceID device_ = 0; // non-owning
     SDL_AudioStream * stream_ = nullptr;
     SDL_AudioSpec spec_{};
     std::vector<std::uint8_t> pcm_;

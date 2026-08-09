@@ -34,7 +34,7 @@ if(BUILD_TESTING)
     add_executable(bard_battle_asset_paths_tests tests/asset_paths_tests.cpp)
     bard_battle_target(bard_battle_asset_paths_tests)
     target_compile_definitions(bard_battle_asset_paths_tests PRIVATE BARD_BATTLE_SOURCE_ROOT="${PROJECT_SOURCE_DIR}")
-    target_link_libraries(bard_battle_asset_paths_tests PRIVATE attempt_engine_map)
+    target_link_libraries(bard_battle_asset_paths_tests PRIVATE attempt_engine_map bard_battle_entity_animations)
     add_test(NAME bard_battle_asset_paths COMMAND bard_battle_asset_paths_tests)
 
     add_executable(bard_battle_protocol_tests tests/protocol_tests.cpp)
@@ -84,6 +84,7 @@ endif()
 
 if(BARD_BATTLE_BUILD_CLIENT)
     add_library(bard_battle_audio STATIC
+        src/platform/audio_playback_device.cpp
         src/platform/effect_player.cpp
         src/platform/song_player.cpp)
     bard_battle_target(bard_battle_audio)
@@ -98,6 +99,12 @@ if(BARD_BATTLE_BUILD_CLIENT)
     target_link_libraries(bard_battle_scene PUBLIC attempt_engine_gpu attempt_engine_render attempt_engine_platform bard_battle_match bard_battle_net)
 
     if(BUILD_TESTING)
+        add_executable(bard_battle_audio_playback_tests tests/audio_playback_tests.cpp)
+        bard_battle_target(bard_battle_audio_playback_tests)
+        target_compile_definitions(bard_battle_audio_playback_tests PRIVATE BARD_BATTLE_SOURCE_ROOT="${PROJECT_SOURCE_DIR}")
+        target_link_libraries(bard_battle_audio_playback_tests PRIVATE bard_battle_audio)
+        add_test(NAME bard_battle_audio_playback COMMAND bard_battle_audio_playback_tests)
+
         add_executable(bard_battle_rhythm_tests tests/rhythm_tests.cpp)
         bard_battle_target(bard_battle_rhythm_tests)
         target_compile_definitions(bard_battle_rhythm_tests PRIVATE BARD_BATTLE_SOURCE_ROOT="${PROJECT_SOURCE_DIR}")

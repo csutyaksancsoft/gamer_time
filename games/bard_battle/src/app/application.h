@@ -8,6 +8,7 @@
 #include "net/client.h"
 #include "game/world.h"
 #include "platform/camera_controller.h"
+#include "platform/audio_playback_device.h"
 #include "platform/effect_player.h"
 #include "platform/sdl_platform.h"
 #include "platform/song_player.h"
@@ -52,6 +53,7 @@ private:
     CameraController camera_controller_;
     World world_;
     net::Client network_;
+    AudioPlaybackDevice audio_device_;
     SongPlayer song_player_;
     EffectPlayer effect_player_;
     std::optional<SongCatalog> song_catalog_;
@@ -72,6 +74,8 @@ private:
     LoadedImage scene_atlas_image_;
     std::uint32_t player_sprite_base_ = 0;
     entity_animation::Catalog entity_animations_;
+    struct PlayerAnimationEvent { entity_animation::PlayerAnimation animation; Vec2f position{}; std::uint64_t started_us=0, ends_us=0; };
+    std::unordered_map<net::PlayerId,PlayerAnimationEvent> player_animation_events_;
     std::unordered_map<net::PlayerId,bool> player_faces_left_;
     std::chrono::steady_clock::time_point last_tick_{};
     Vec2f predicted_position_{};

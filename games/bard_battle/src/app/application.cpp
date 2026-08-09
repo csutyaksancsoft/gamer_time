@@ -47,6 +47,7 @@ void Application::initialize() {
     }
 
     platform_.initialize({"Bard Battle", config_.initial_width, config_.initial_height});
+    audio_device_.initialize();
     scene_renderer_.initialize(platform_.window(), config_.shader_dir);
     const std::string map_path = config_.asset_dir + "/" + kDefaultMapName;
     const TmxMapAsset map_asset = assets::load_tmx_map(map_path);
@@ -70,7 +71,7 @@ void Application::initialize() {
     } catch (const std::exception &) {
         // Networking and movement remain usable until the real song asset is supplied.
     }
-    effect_player_.load(config_.asset_dir + "/audio/sfx");
+    effect_player_.load(audio_device_,config_.asset_dir + "/audio/sfx");
     initialized_ = true;
 }
 
@@ -83,6 +84,7 @@ void Application::shutdown() {
     network_.disconnect();
     song_player_.stop();
     effect_player_.shutdown();
+    audio_device_.shutdown();
     platform_.shutdown();
 
     initialized_ = false;
@@ -137,9 +139,17 @@ void Application::tick_frame(float dt_seconds) {
     network_.update();
     if(network_.connected())was_connected_=true;
     if(was_connected_&&!network_.connected()){menu_error_="Disconnected: "+network_.status();in_menu_=true;was_connected_=false;auto menu_ui=build_menu_ui(input.window_width,input.window_height);if(ui_debug_visible_)append_ui_debug(menu_ui);scene_renderer_.set_ui_draw_list(std::move(menu_ui));const std::array<std::uint8_t,1> visible{255};scene_renderer_.upload_frame_resources({},visible,1,1,camera_controller_.state());scene_renderer_.draw_frame();return;}
-    net::SoundEvent sound_event{};
-    while(network_.take_sound_event(sound_event))effect_player_.play(sound_event.cue,predicted_position_,sound_event.position,sound_event.participant);
     const net::Snapshot & snapshot = network_.snapshot();
+    net::SoundEvent sound_event{};
+    while(network_.take_sound_event(sound_event)){
+        effect_player_.play(sound_event.cue,predicted_position_,sound_event.position,sound_event.participant);
+        net::PlayerId animated=0;entity_animation::PlayerAnimation state=entity_animation::PlayerAnimation::idle;
+        if(sound_event.cue==net::SoundCue::shot_success){animated=sound_event.source_id;state=entity_animation::PlayerAnimation::attack;}
+        else if(sound_event.cue==net::SoundCue::swing_attack){animated=sound_event.source_id;state=entity_animation::PlayerAnimation::melee;}
+        else if(sound_event.cue==net::SoundCue::shield_break){animated=sound_event.target_id;state=entity_animation::PlayerAnimation::shield_break;}
+        else if(sound_event.cue==net::SoundCue::death){animated=sound_event.target_id;state=entity_animation::PlayerAnimation::death;}
+        if(animated){const auto player=std::find_if(snapshot.players.begin(),snapshot.players.end(),[&](const auto&p){return p.id==animated;});const auto variant=player==snapshot.players.end()?std::uint8_t{1}:entity_animation::player_variant(player->team,player->color,snapshot.mode==net::GameMode::teams);const auto*strip=entity_animations_.find_player(variant,state);const auto duration=strip?entity_animation::duration_us(*strip):500000ULL;player_animation_events_[animated]={state,sound_event.position,sound_event.server_time_us,sound_event.server_time_us+duration};}
+    }
     if (!snapshot.players.empty()) {
         std::vector<ReplicatedUnitState> units;
         units.reserve(snapshot.players.size()+snapshot.projectiles.size()+snapshot.melee_effects.size());
@@ -148,9 +158,11 @@ void Application::tick_frame(float dt_seconds) {
         for (const net::PlayerState & player : snapshot.players) {
             const bool just_respawned=player.id==network_.player_id()&&!local_alive_&&player.alive;
             if(player.id==network_.player_id()){local_alive_=player.alive;local_respawn_at_us_=player.respawn_at_us;if(just_respawned){predicted_position_=player.position;have_predicted_position_=true;}}
-            if(!player.alive)continue;
+            const auto animation_event=player_animation_events_.find(player.id);const bool event_active=animation_event!=player_animation_events_.end()&&snapshot.server_time_us<animation_event->second.ends_us;
+            if(!player.alive&&(!event_active||animation_event->second.animation!=entity_animation::PlayerAnimation::death))continue;
             Vec2f position = player.position;
-            if (player.id == network_.player_id()) {
+            if(!player.alive&&event_active)position=animation_event->second.position;
+            if (player.alive && player.id == network_.player_id()) {
                 if (!have_predicted_position_) { predicted_position_ = position; have_predicted_position_ = true; }
                 else { predicted_position_ += (position - predicted_position_) * 0.18f; }
                 position = predicted_position_;
@@ -161,8 +173,10 @@ void Application::tick_frame(float dt_seconds) {
             unit.vision_radius = net::kVisionRadius;
             const std::uint8_t variant=entity_animation::player_variant(player.team,player.color,snapshot.mode==net::GameMode::teams);
             unit.sprite_index = player_sprite_base_ + variant-1u;
-            const auto role=static_cast<entity_animation::Role>(variant-1u);
-            if(const auto*strip=entity_animations_.find(role)){const bool moving=length_squared(player.velocity)>0.0001f;const auto frame=moving?entity_animation::frame_index(*strip,snapshot.server_time_us,true):0u;unit.sprite_index=strip->frames[frame].atlas_index;unit.size=strip->world_size;}
+            const bool shielding=player.shield_until_us>snapshot.server_time_us;
+            const bool moving=length_squared(player.velocity)>0.0001f;
+            const auto state=event_active?animation_event->second.animation:shielding?entity_animation::PlayerAnimation::shield:moving?entity_animation::PlayerAnimation::running:entity_animation::PlayerAnimation::idle;
+            if(const auto*strip=entity_animations_.find_player(variant,state)){const auto elapsed=event_active?(snapshot.server_time_us>=animation_event->second.started_us?snapshot.server_time_us-animation_event->second.started_us:0):shielding&&snapshot.server_time_us>=player.shield_started_us?snapshot.server_time_us-player.shield_started_us:snapshot.server_time_us;const bool loop=state==entity_animation::PlayerAnimation::running||state==entity_animation::PlayerAnimation::shield;const auto frame=entity_animation::frame_index(*strip,elapsed,loop);unit.sprite_index=strip->frames[frame].atlas_index;unit.size=strip->world_size;}
             if(player.velocity.x<0.0f)player_faces_left_[player.id]=true;else if(player.velocity.x>0.0f)player_faces_left_[player.id]=false;
             if(player_faces_left_[player.id])unit.transform_flags=assets::kTmxFlipHorizontal;
             unit.rotation_radians = 0.0f;
@@ -174,13 +188,13 @@ void Application::tick_frame(float dt_seconds) {
                 unit.color[2] = 1.0f;
             }
             units.push_back(unit);
-            if(player.shield_until_us>snapshot.server_time_us){ReplicatedUnitState shield{};shield.id=++render_id;shield.position=position;shield.size={40.0f,40.0f};if(const auto*strip=entity_animations_.find(entity_animation::Role::shield)){const auto elapsed=snapshot.server_time_us>=player.shield_started_us?snapshot.server_time_us-player.shield_started_us:0;shield.sprite_index=strip->frames[entity_animation::frame_index(*strip,elapsed,true)].atlas_index;shield.size=strip->world_size;}else{shield.solid_color=true;shield.circle_outline=true;shield.color[0]=0.1f;shield.color[1]=0.55f;shield.color[2]=1.0f;shield.color[3]=0.42f;}units.push_back(shield);}
         }
         for(const net::ProjectileState & p:snapshot.projectiles){ReplicatedUnitState unit{};unit.id=++render_id;unit.position=p.position;unit.sprite_index=1000001u;unit.size={18.0f,6.0f};unit.rotation_radians=p.angle;if(const auto*strip=entity_animations_.find(entity_animation::Role::projectile)){const auto elapsed=snapshot.server_time_us>=p.spawned_at_us?snapshot.server_time_us-p.spawned_at_us:0;unit.sprite_index=strip->frames[entity_animation::frame_index(*strip,elapsed,true)].atlas_index;unit.size=strip->world_size;}else{unit.solid_color=true;unit.color[0]=1.0f;unit.color[1]=0.85f;unit.color[2]=0.15f;}units.push_back(unit);}
         for(const net::MeleeEffectState & melee:snapshot.melee_effects){if(melee.expires_at_us<=snapshot.server_time_us)continue;ReplicatedUnitState unit{};unit.id=++render_id;unit.position=melee.position;unit.size={melee.radius*2.0f,melee.radius*2.0f};unit.rotation_radians=melee.angle;if(const auto*strip=entity_animations_.find(entity_animation::Role::melee)){const auto elapsed=snapshot.server_time_us>=melee.started_at_us?snapshot.server_time_us-melee.started_at_us:0;unit.sprite_index=strip->frames[entity_animation::frame_index(*strip,elapsed,false)].atlas_index;unit.size=strip->world_size;}else{unit.solid_color=true;unit.circle_outline=true;unit.color[0]=1.0f;unit.color[1]=0.35f;unit.color[2]=0.1f;unit.color[3]=0.82f;}units.push_back(unit);}
         world_.replace_replicated_units(units);
         world_.set_local_unit(network_.player_id());
     }
+    for(auto it=player_animation_events_.begin();it!=player_animation_events_.end();)if(snapshot.server_time_us>=it->second.ends_us)it=player_animation_events_.erase(it);else ++it;
 
     const auto local_player=std::find_if(snapshot.players.begin(),snapshot.players.end(),[&](const auto&p){return p.id==network_.player_id();});
     const std::uint64_t predicted_server_now=network_.server_time_us();
@@ -232,7 +246,7 @@ void Application::tick_frame(float dt_seconds) {
     if(network_.take_song_schedule(schedule)) {
         const auto local_start = static_cast<std::uint64_t>(static_cast<std::int64_t>(schedule.server_start_us) - network_.server_offset_us());
         const auto * config=song_catalog_?song_catalog_->find(schedule.song_id):nullptr;
-        if(config&&song_player_.load(config_.asset_dir+"/audio/songs",*config))song_player_.schedule(local_start);
+        if(config&&song_player_.load(audio_device_,config_.asset_dir+"/audio/songs",*config))song_player_.schedule(local_start);
         rhythm_hud_.schedule(schedule,local_start);
     }
     song_player_.update(rhythm_now_us);
@@ -286,8 +300,12 @@ std::string Application::build_overlay_text() const {
     overlay << "ESC quit | WASD move | LEFT CLICK fire | RIGHT CLICK shield | SPACE melee | wheel zoom | F3 collision | F4 solid terrain | F5 text\n\n";
     overlay << "Network: " << network_.status() << " | Player ID: " << network_.player_id() << '\n';
     overlay << "Server clock offset: " << network_.server_offset_us() / 1000 << " ms\n";
-    overlay << "Audio: " << (song_player_.error().empty() ? "ready" : song_player_.error()) << '\n';
-    if(!effect_player_.diagnostic().empty())overlay<<"SFX: "<<effect_player_.diagnostic()<<'\n';
+    overlay << "Audio device: " << (audio_device_.ready() ? "ready" : audio_device_.diagnostic()) << '\n';
+    overlay << "Music: " << (song_player_.error().empty() ? "ready" : song_player_.error()) << '\n';
+    overlay << "SFX: " << effect_player_.loaded_clip_count() << " clips in " << effect_player_.populated_pool_count() << "/10 cues"
+            << " | events " << effect_player_.request_count() << " | queued " << effect_player_.queued_count()
+            << " | last " << effect_player_.last_cue() << '\n';
+    if(!effect_player_.diagnostic().empty())overlay<<"SFX status: "<<effect_player_.diagnostic()<<'\n';
     if(have_rhythm_result_) overlay << "Last hit: " << net::grade_name(last_rhythm_result_.grade) << " (" << last_rhythm_result_.offset_ms << " ms) | "<<(last_rhythm_result_.shot_fired?"SHOT":last_rhythm_result_.shield_activated?"SHIELD":last_rhythm_result_.melee_fired?"MELEE":"NO ACTION")<<" | P/G/M " << last_rhythm_result_.perfect << "/" << last_rhythm_result_.good << "/" << last_rhythm_result_.miss << '\n';
     if(!local_alive_){const auto now=network_.server_time_us();const auto remaining=local_respawn_at_us_>now?local_respawn_at_us_-now:0;overlay<<"RESPAWNING IN "<<(remaining+999999)/1000000<<"\n";}
     const std::string rhythm_feedback=rhythm_hud_.feedback(net::monotonic_time_us());
