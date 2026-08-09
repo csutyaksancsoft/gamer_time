@@ -39,6 +39,6 @@ private:
 
 std::uint32_t frame_index(const Strip & strip, std::uint64_t elapsed_us, bool loop);
 std::uint64_t duration_us(const Strip & strip);
-std::uint8_t player_variant(std::uint8_t team, std::uint32_t color, bool teams);
+std::uint8_t player_folder(std::uint32_t player_id, std::uint8_t team, bool teams);
 
 } // namespace entity_animation

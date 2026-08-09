@@ -30,4 +30,7 @@ int main() {
     assert(animations.find_player(1, entity_animation::PlayerAnimation::death)->tsx_path.filename() == "death.tsx");
     assert(animations.find_player(1, entity_animation::PlayerAnimation::shield)->tsx_path.filename() == "shield.tsx");
     assert(animations.find_player(1, entity_animation::PlayerAnimation::shield_break)->tsx_path.filename() == "shield_break.tsx");
+    assert(animations.find_player(1, entity_animation::PlayerAnimation::running) == idle);
+    assert(animations.find_player(1, entity_animation::PlayerAnimation::melee) == idle);
+    assert(animations.find_player(2, entity_animation::PlayerAnimation::attack) == idle);
 }

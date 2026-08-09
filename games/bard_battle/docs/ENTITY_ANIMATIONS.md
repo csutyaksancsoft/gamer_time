@@ -16,6 +16,8 @@ entities/
 
 Every player TSX needs `bard.player` set to `1` through `4` and `bard.animation` set to `death`, `idle`, `running`, `attack`, `melee`, `shield_break`, or `shield`. Optional positive float properties `bard.world_width` and `bard.world_height` set the rendered world-space size. Non-player projectile and melee-effect sheets continue to use `bard.role=projectile` or `bard.role=melee`.
 
+In free-for-all, player IDs 1 through 4 use `player_1` through `player_4`; later IDs wrap through those four folders. In team mode, the selected team number chooses the folder.
+
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <tileset version="1.10" tiledversion="1.10.2" name="fireball"

@@ -148,7 +148,7 @@ void Application::tick_frame(float dt_seconds) {
         else if(sound_event.cue==net::SoundCue::swing_attack){animated=sound_event.source_id;state=entity_animation::PlayerAnimation::melee;}
         else if(sound_event.cue==net::SoundCue::shield_break){animated=sound_event.target_id;state=entity_animation::PlayerAnimation::shield_break;}
         else if(sound_event.cue==net::SoundCue::death){animated=sound_event.target_id;state=entity_animation::PlayerAnimation::death;}
-        if(animated){const auto player=std::find_if(snapshot.players.begin(),snapshot.players.end(),[&](const auto&p){return p.id==animated;});const auto variant=player==snapshot.players.end()?std::uint8_t{1}:entity_animation::player_variant(player->team,player->color,snapshot.mode==net::GameMode::teams);const auto*strip=entity_animations_.find_player(variant,state);const auto duration=strip?entity_animation::duration_us(*strip):500000ULL;player_animation_events_[animated]={state,sound_event.position,sound_event.server_time_us,sound_event.server_time_us+duration};}
+        if(animated){const auto player=std::find_if(snapshot.players.begin(),snapshot.players.end(),[&](const auto&p){return p.id==animated;});const auto folder=player==snapshot.players.end()?entity_animation::player_folder(animated,0,false):entity_animation::player_folder(player->id,player->team,snapshot.mode==net::GameMode::teams);const auto*strip=entity_animations_.find_player(folder,state);const auto duration=strip?entity_animation::duration_us(*strip):500000ULL;const auto received_us=network_.server_time_us();player_animation_events_[animated]={state,sound_event.position,received_us,received_us+duration};}
     }
     if (!snapshot.players.empty()) {
         std::vector<ReplicatedUnitState> units;
@@ -171,12 +171,12 @@ void Application::tick_frame(float dt_seconds) {
             unit.id = player.id;
             unit.position = position;
             unit.vision_radius = net::kVisionRadius;
-            const std::uint8_t variant=entity_animation::player_variant(player.team,player.color,snapshot.mode==net::GameMode::teams);
-            unit.sprite_index = player_sprite_base_ + variant-1u;
+            const std::uint8_t folder=entity_animation::player_folder(player.id,player.team,snapshot.mode==net::GameMode::teams);
+            unit.sprite_index = player_sprite_base_ + folder-1u;
             const bool shielding=player.shield_until_us>snapshot.server_time_us;
             const bool moving=length_squared(player.velocity)>0.0001f;
             const auto state=event_active?animation_event->second.animation:shielding?entity_animation::PlayerAnimation::shield:moving?entity_animation::PlayerAnimation::running:entity_animation::PlayerAnimation::idle;
-            if(const auto*strip=entity_animations_.find_player(variant,state)){const auto elapsed=event_active?(snapshot.server_time_us>=animation_event->second.started_us?snapshot.server_time_us-animation_event->second.started_us:0):shielding&&snapshot.server_time_us>=player.shield_started_us?snapshot.server_time_us-player.shield_started_us:snapshot.server_time_us;const bool loop=state==entity_animation::PlayerAnimation::running||state==entity_animation::PlayerAnimation::shield;const auto frame=entity_animation::frame_index(*strip,elapsed,loop);unit.sprite_index=strip->frames[frame].atlas_index;unit.size=strip->world_size;}
+            if(const auto*strip=entity_animations_.find_player(folder,state)){const auto elapsed=event_active?(snapshot.server_time_us>=animation_event->second.started_us?snapshot.server_time_us-animation_event->second.started_us:0):shielding&&snapshot.server_time_us>=player.shield_started_us?snapshot.server_time_us-player.shield_started_us:snapshot.server_time_us;const bool loop=state==entity_animation::PlayerAnimation::running||state==entity_animation::PlayerAnimation::shield;const auto frame=entity_animation::frame_index(*strip,elapsed,loop);unit.sprite_index=strip->frames[frame].atlas_index;unit.size=strip->world_size;}
             if(player.velocity.x<0.0f)player_faces_left_[player.id]=true;else if(player.velocity.x>0.0f)player_faces_left_[player.id]=false;
             if(player_faces_left_[player.id])unit.transform_flags=assets::kTmxFlipHorizontal;
             unit.rotation_radians = 0.0f;

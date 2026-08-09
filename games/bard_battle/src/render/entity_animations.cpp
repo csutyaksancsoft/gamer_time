@@ -22,5 +22,5 @@ const Strip*Catalog::find_player(std::uint8_t player,PlayerAnimation state)const
 const Strip*Catalog::find(Role r)const{const auto&v=effects_[static_cast<std::size_t>(r)];return v?&*v:nullptr;}
 std::uint64_t duration_us(const Strip&s){std::uint64_t total=0;for(const auto&f:s.frames)total+=f.duration_ms;return total*1000;}
 std::uint32_t frame_index(const Strip&s,std::uint64_t us,bool loop){if(s.frames.empty())return 0;const auto total=duration_us(s)/1000;if(!total)return 0;std::uint64_t ms=us/1000;if(loop)ms%=total;else if(ms>=total)return static_cast<std::uint32_t>(s.frames.size()-1);std::uint64_t end=0;for(std::uint32_t i=0;i<s.frames.size();++i){end+=s.frames[i].duration_ms;if(ms<end)return i;}return static_cast<std::uint32_t>(s.frames.size()-1);}
-std::uint8_t player_variant(std::uint8_t team,std::uint32_t color,bool teams){if(teams&&team>=1&&team<=4)return team;std::uint32_t x=color;x^=x>>16;x*=0x7feb352du;x^=x>>15;x*=0x846ca68bu;x^=x>>16;return static_cast<std::uint8_t>(x%4+1);}
+std::uint8_t player_folder(std::uint32_t player_id,std::uint8_t team,bool teams){if(teams&&team>=1&&team<=4)return team;if(player_id==0)return 1;return static_cast<std::uint8_t>((player_id-1)%4+1);}
 } // namespace entity_animation
