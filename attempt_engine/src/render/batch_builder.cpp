@@ -45,6 +45,7 @@ RenderBatch BatchBuilder::build(const RenderWorld & render_world) const {
         instance.world_pos = projected.source.world_pos;
         instance.size = projected.source.size;
         instance.sprite_index = projected.source.sprite_index;
+        instance.atlas_span = projected.source.atlas_span;
         instance.flags = projected.source.selected ? kInstanceFlagSelected : 0u;
         if(projected.source.solid_color)instance.flags|=kInstanceFlagSolidColor;
         if(projected.source.circle_outline)instance.flags|=kInstanceFlagCircleOutline;

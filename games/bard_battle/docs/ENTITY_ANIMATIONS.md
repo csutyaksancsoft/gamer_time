@@ -36,7 +36,11 @@ In free-for-all, player IDs 1 through 4 use `player_1` through `player_4`; later
 </tileset>
 ```
 
-Player and horizontal movement art faces right. Projectile and melee art must also face right; the client rotates those sheets to the server-authoritative attack angle. Each state owns its complete animation strip; empty/transparent frames are allowed and retain their duration.
+Player and horizontal movement art faces right. Projectile art must also face right; the client rotates it to the server-authoritative attack angle. Each state owns its complete animation strip; empty/transparent frames are allowed and retain their duration. Frames larger than the map's 32×32 atlas cell occupy multiple atlas cells and retain their native pixel resolution.
+
+## Populating the melee animation
+
+Player melee is a special single-frame spin. Put one square image in `entities/player_N/melee/`, define it as a one-tile TSX with `bard.animation=melee`, and use the desired complete spin duration for its only frame. The supplied Player 1 melee is 64×64, renders at 64×64 world units, and rotates clockwise once over 250 ms. The server applies one centered circular hit with a 32-unit radius when the rhythm action succeeds; the mouse direction does not affect it.
 
 ## Populating the shield animation
 

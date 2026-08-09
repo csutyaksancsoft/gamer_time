@@ -79,6 +79,7 @@ void World::replace_replicated_units(const std::vector<ReplicatedUnitState> & ne
         unit_ids_.push_back(state.id);
         transforms_[state.id] = {state.position};
         renders_[state.id].sprite_index=state.sprite_index;
+        renders_[state.id].atlas_span=state.atlas_span;
         renders_[state.id].footprint=state.size;
         renders_[state.id].rotation_radians=state.rotation_radians;
         renders_[state.id].transform_flags=state.transform_flags;

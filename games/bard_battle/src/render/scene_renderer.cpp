@@ -438,7 +438,7 @@ void SceneRenderer::create_graphics_pipeline() {
     binding_descriptions[1].stride = sizeof(InstanceData);
     binding_descriptions[1].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
 
-    std::array<VkVertexInputAttributeDescription, 9> attribute_descriptions{};
+    std::array<VkVertexInputAttributeDescription, 10> attribute_descriptions{};
     attribute_descriptions[0] = {0, 0, VK_FORMAT_R32G32_SFLOAT, 0};
     attribute_descriptions[1] = {1, 0, VK_FORMAT_R32G32_SFLOAT, sizeof(float) * 2};
     attribute_descriptions[2] = {2, 1, VK_FORMAT_R32G32_SFLOAT, static_cast<uint32_t>(offsetof(InstanceData, world_pos))};
@@ -448,6 +448,7 @@ void SceneRenderer::create_graphics_pipeline() {
     attribute_descriptions[6] = {6, 1, VK_FORMAT_R32_SFLOAT, static_cast<uint32_t>(offsetof(InstanceData, opacity))};
     attribute_descriptions[7] = {7, 1, VK_FORMAT_R32_SFLOAT, static_cast<uint32_t>(offsetof(InstanceData, rotation_radians))};
     attribute_descriptions[8] = {8, 1, VK_FORMAT_R32G32B32A32_SFLOAT, static_cast<uint32_t>(offsetof(InstanceData, color))};
+    attribute_descriptions[9] = {9, 1, VK_FORMAT_R32_UINT, static_cast<uint32_t>(offsetof(InstanceData, atlas_span))};
 
     vertex_input_info.vertexBindingDescriptionCount = 2;
     vertex_input_info.pVertexBindingDescriptions = binding_descriptions;

@@ -7,9 +7,8 @@
 
 namespace game {
 
-constexpr float kMeleeRadius = 24.0f;
-constexpr float kMeleeOffset = 28.0f;
-constexpr std::uint64_t kMeleeEffectUs = 150000;
+constexpr float kMeleeRadius = 32.0f;
+constexpr std::uint64_t kMeleeEffectUs = 250000;
 
 inline std::uint64_t beat_duration_us(float bpm) {
     return static_cast<std::uint64_t>(60000000.0f / std::max(bpm, 1.0f));

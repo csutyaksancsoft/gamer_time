@@ -22,9 +22,9 @@ add_library(bard_battle_match STATIC src/game/match_rules.cpp src/ui/ui_model.cp
 bard_battle_target(bard_battle_match)
 target_link_libraries(bard_battle_match PUBLIC bard_battle_net attempt_engine_core)
 
-add_library(bard_battle_entity_animations STATIC src/render/entity_animations.cpp)
+add_library(bard_battle_entity_animations STATIC src/render/entity_animations.cpp src/render/entity_animation_packing.cpp)
 bard_battle_target(bard_battle_entity_animations)
-target_link_libraries(bard_battle_entity_animations PUBLIC attempt_engine_core)
+target_link_libraries(bard_battle_entity_animations PUBLIC attempt_engine_assets attempt_engine_core)
 
 add_library(bard_battle_spawn STATIC src/server/spawn_zones.cpp)
 bard_battle_target(bard_battle_spawn)
@@ -112,7 +112,7 @@ if(BARD_BATTLE_BUILD_CLIENT)
         add_test(NAME bard_battle_rhythm_gameplay COMMAND bard_battle_rhythm_tests)
     endif()
 
-    add_library(bard_battle_app STATIC src/app/application.cpp src/render/entity_animation_packing.cpp)
+    add_library(bard_battle_app STATIC src/app/application.cpp)
     bard_battle_target(bard_battle_app)
     target_link_libraries(bard_battle_app PUBLIC attempt_engine_assets attempt_engine_world attempt_engine_render bard_battle_audio bard_battle_scene bard_battle_net bard_battle_rhythm bard_battle_match bard_battle_entity_animations)
 

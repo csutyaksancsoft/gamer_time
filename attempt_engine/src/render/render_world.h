@@ -27,6 +27,7 @@ struct RenderUnit {
     Vec2f world_pos{};
     Vec2f size{24.0f, 24.0f};
     std::uint32_t sprite_index = 0;
+    std::uint32_t atlas_span = 0x00010001u;
     bool visible_in_fog = true;
     bool selected = false;
     float rotation_radians = 0.0f;
@@ -79,6 +80,7 @@ struct InstanceData {
     Vec2f world_pos{};
     Vec2f size{24.0f, 24.0f};
     std::uint32_t sprite_index = 0;
+    std::uint32_t atlas_span = 0x00010001u;
     std::uint32_t flags = 0;
     float opacity = 1.0f;
     float rotation_radians = 0.0f;

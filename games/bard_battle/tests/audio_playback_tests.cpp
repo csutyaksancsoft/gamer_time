@@ -19,7 +19,7 @@ int main() {
         const std::string assets = std::string(BARD_BATTLE_SOURCE_ROOT) + "/games/bard_battle/assets/audio";
         EffectPlayer effects;
         effects.load(device, assets + "/sfx");
-        assert(effects.loaded_clip_count() == 4);
+        assert(effects.loaded_clip_count() == 6);
         assert(effects.populated_pool_count() == 2);
 
         SongConfig song{};
@@ -37,7 +37,7 @@ int main() {
 
         music.update(2000000);
         assert(music.playing());
-        effects.play(net::SoundCue::shield_failure, {}, {}, true);
+        effects.play(net::SoundCue::respawn, {}, {}, true);
         assert(effects.queued_count() == 2);
 
         effects.play(net::SoundCue::shot_success, {}, {}, true);

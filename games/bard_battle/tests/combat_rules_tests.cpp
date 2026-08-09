@@ -19,6 +19,7 @@ int main() {
     require(extended.stunned_until==now+3*beat);
     const auto killed=game::resolve_shield_melee(net::ShieldMeleeMode::kill,now,beat);
     require(killed.killed&&killed.shield_until==0&&killed.stunned_until==0);
-    require(game::melee_overlaps({0,0},game::kMeleeRadius,{32,0},8.0f));
-    require(!game::melee_overlaps({0,0},game::kMeleeRadius,{33,0},8.0f));
+    require(game::kMeleeRadius==32.0f&&game::kMeleeEffectUs==250000);
+    for(const Vec2f target:std::initializer_list<Vec2f>{{40,0},{-40,0},{0,40},{0,-40}})require(game::melee_overlaps({0,0},game::kMeleeRadius,target,8.0f));
+    require(!game::melee_overlaps({0,0},game::kMeleeRadius,{41,0},8.0f));
 }

@@ -105,6 +105,7 @@ struct ReplicatedUnitState {
     UnitId id = 0;
     Vec2f position{};
     std::uint32_t sprite_index = 49;
+    std::uint32_t atlas_span = 0x00010001u;
     Vec2f size{16.0f,16.0f};
     float rotation_radians = 0.0f;
     std::uint32_t transform_flags = 0;

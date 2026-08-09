@@ -28,7 +28,9 @@ int main() {
         layer.tiles.push_back({});
         phases.terrain_layers.push_back(layer);
     }
-    phases.projected_units.push_back({});
+    ProjectedUnit oversized{};
+    oversized.source.atlas_span=0x00020002u;
+    phases.projected_units.push_back(oversized);
     const RenderBatch batch = BatchBuilder{}.build(phases);
     assert(batch.terrain_layer_ranges.size() == 4);
     assert(batch.terrain_layer_ranges[0].render_phase == TileRenderPhase::BelowUnits);
@@ -36,4 +38,5 @@ int main() {
     assert(batch.terrain_layer_ranges[2].render_phase == TileRenderPhase::BelowUnits);
     assert(batch.terrain_layer_ranges[3].render_phase == TileRenderPhase::AboveUnits);
     assert(batch.unit_instance_offset == 4 && batch.unit_instance_count == 1);
+    assert(batch.instances[batch.unit_instance_offset].atlas_span == 0x00020002u);
 }

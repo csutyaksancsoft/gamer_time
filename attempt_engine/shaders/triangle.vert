@@ -21,6 +21,7 @@ layout(location = 5) in uint inFlags;
 layout(location = 6) in float inOpacity;
 layout(location = 7) in float inRotationRadians;
 layout(location = 8) in vec4 inColor;
+layout(location = 9) in uint inAtlasSpan;
 
 layout(location = 0) out vec2 vUv;
 layout(location = 1) out vec2 vWorldPos;
@@ -67,7 +68,8 @@ void main() {
     float tileRowFromTop = float(inSpriteIndex / atlasColumns);
     float tileY = tileRowFromTop;
     vec2 tileOrigin = vec2(tileX, tileY) * scene.atlasTileSize;
+    vec2 atlasSpan = vec2(max(inAtlasSpan & 0xffffu, 1u), max(inAtlasSpan >> 16, 1u));
     vec2 uvMin = (tileOrigin + vec2(0.5)) / scene.atlasTextureSize;
-    vec2 uvMax = (tileOrigin + scene.atlasTileSize - vec2(0.5)) / scene.atlasTextureSize;
+    vec2 uvMax = (tileOrigin + scene.atlasTileSize * atlasSpan - vec2(0.5)) / scene.atlasTextureSize;
     vAtlasUv = mix(uvMin, uvMax, tileUv);
 }

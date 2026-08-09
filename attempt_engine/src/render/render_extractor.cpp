@@ -82,6 +82,7 @@ RenderWorld RenderExtractor::build(
         render_unit.world_pos = transform->position;
         render_unit.size = render->footprint;
         render_unit.sprite_index = render->sprite_index;
+        render_unit.atlas_span = render->atlas_span;
         render_unit.selected = unit->selected;
         render_unit.rotation_radians=render->rotation_radians;
         render_unit.transform_flags=render->transform_flags;
