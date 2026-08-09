@@ -1,4 +1,5 @@
 #include "server/spawn_zones.h"
+#include "assets/tmx_map_loader.h"
 
 #include <cmath>
 #include <stdexcept>
@@ -49,6 +50,13 @@ int main() {
     auto malformed=fixture();malformed.object_layers[0].objects[0].width=0;malformed.object_layers[0].objects.push_back(rectangle(99,0,0));malformed.object_layers[0].objects.back().is_point=true;require(throws_with(malformed,"contains no usable"),"unsupported objects accepted");
 
     auto blocked=fixture();TmxObjectLayerAsset wall{};wall.name="collision_player";wall.objects.push_back(rectangle(100,50,500));blocked.object_layers.push_back(wall);blocked.layer_order.push_back({TmxLayerType::Object,blocked.object_layers.size()-1});require(throws_with(blocked,"object 1"),"fully blocked zone accepted");
+
+    auto concave=fixture();TmxObjectLayerAsset surround{};surround.name="collision_player";auto u=rectangle(101,50,500);u.has_polygon=true;u.polygon.points={{0,0},{100,0},{100,100},{90,100},{90,10},{10,10},{10,100},{0,100}};surround.objects.push_back(u);concave.object_layers.push_back(surround);concave.layer_order.push_back({TmxLayerType::Object,concave.object_layers.size()-1});require(!throws_with(concave,"object 1"),"concave polygon AABB incorrectly blocked zone");
+
+    const std::string default_map=std::string(BARD_BATTLE_SOURCE_ROOT)+"/games/bard_battle/assets/tiled_projects/maps/brawlers_ballad.tmx";
+    const auto default_world=MapWorld::from_tmx(assets::load_tmx_map(default_map));
+    const auto default_collision=CollisionWorld::from_map(default_world);
+    server::SpawnZones default_zones(default_world,default_collision);
 
     std::vector<server::SpawnOccupant> occupants{{{-400,350},true},{ {-200,350},true},{ {0,350},true},{ {200,350},true}};
     const Vec2f crowded=zones.sample(net::GameMode::ffa,1,random,occupants);require(std::isfinite(crowded.x)&&std::isfinite(crowded.y),"crowded fallback failed");

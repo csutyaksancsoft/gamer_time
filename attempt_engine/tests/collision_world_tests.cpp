@@ -9,6 +9,35 @@ namespace {
 Vec2f center(const CollisionShape & shape) {
     return (shape.bounds.min + shape.bounds.max) * 0.5f;
 }
+
+CollisionWorld concave_collision() {
+    TmxMapAsset asset{};
+    asset.orientation = "orthogonal";
+    asset.render_order = "right-down";
+    asset.width = asset.height = 100;
+    asset.tile_width = asset.tile_height = 10;
+    TmxTilesetAsset tiles{};
+    tiles.first_gid = 1;
+    tiles.name = "fixture";
+    tiles.tile_width = tiles.tile_height = 10;
+    tiles.tile_count = tiles.columns = 1;
+    asset.tilesets.push_back(tiles);
+
+    TmxObjectAsset object{};
+    object.id = 1;
+    object.x = object.y = 500.0f;
+    object.has_polygon = true;
+    object.polygon.points = {
+        {0, 0}, {100, 0}, {100, 100}, {70, 100},
+        {70, 30}, {30, 30}, {30, 100}, {0, 100},
+    };
+    TmxObjectLayerAsset layer{};
+    layer.name = "collision_player";
+    layer.objects.push_back(object);
+    asset.object_layers.push_back(layer);
+    asset.layer_order.push_back({TmxLayerType::Object, 0});
+    return CollisionWorld::from_map(MapWorld::from_tmx(asset));
+}
 }
 
 int main() {
@@ -38,5 +67,18 @@ int main() {
     // Legacy/case-mismatched layers and semantic properties create no shapes.
     const CollisionBounds legacy_area{{60.0f, -100.0f}, {320.0f, 100.0f}};
     assert(collision.query_bounds(CollisionChannel::Player, legacy_area).empty());
+
+    const CollisionWorld concave = concave_collision();
+    // This rectangle lies in the concavity while still overlapping the polygon's AABB.
+    assert(concave.query_bounds(CollisionChannel::Player, {{40, -90}, {60, -40}}).empty());
+    // A rectangle corner inside the polygon, an edge crossing, and corner contact all collide.
+    assert(concave.query_bounds(CollisionChannel::Player, {{90, -20}, {110, -10}}).size() == 1);
+    assert(concave.query_bounds(CollisionChannel::Player, {{-10, -50}, {10, -40}}).size() == 1);
+    assert(concave.query_bounds(CollisionChannel::Player, {{-10, -110}, {0, -100}}).size() == 1);
+    // Polygon contained by the query and a query contained by the polygon both collide.
+    assert(concave.query_bounds(CollisionChannel::Player, {{-10, -110}, {110, 10}}).size() == 1);
+    assert(concave.query_bounds(CollisionChannel::Player, {{10, -20}, {20, -10}}).size() == 1);
+    // Channel filtering is still applied before geometry testing.
+    assert(concave.query_bounds(CollisionChannel::Shot, {{-10, -110}, {110, 10}}).empty());
 
 }

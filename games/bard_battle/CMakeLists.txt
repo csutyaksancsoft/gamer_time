@@ -59,6 +59,7 @@ if(BUILD_TESTING)
 
     add_executable(bard_battle_spawn_zones_tests tests/spawn_zones_tests.cpp)
     bard_battle_target(bard_battle_spawn_zones_tests)
+    target_compile_definitions(bard_battle_spawn_zones_tests PRIVATE BARD_BATTLE_SOURCE_ROOT="${PROJECT_SOURCE_DIR}")
     target_link_libraries(bard_battle_spawn_zones_tests PRIVATE bard_battle_spawn)
     add_test(NAME bard_battle_spawn_zones COMMAND bard_battle_spawn_zones_tests)
 

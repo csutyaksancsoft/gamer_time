@@ -93,6 +93,36 @@ bool segments_intersect(const Vec2f & p, const Vec2f & p2, const Vec2f & q, cons
     return t >= 0.0f && t <= 1.0f && u >= 0.0f && u <= 1.0f;
 }
 
+bool polygon_intersects_bounds(const std::vector<Vec2f> & polygon, const CollisionBounds & bounds) {
+    const Vec2f corners[] = {
+        bounds.min,
+        {bounds.max.x, bounds.min.y},
+        bounds.max,
+        {bounds.min.x, bounds.max.y},
+    };
+
+    for (const Vec2f & corner : corners) {
+        if (point_in_polygon(polygon, corner)) {
+            return true;
+        }
+    }
+    for (const Vec2f & point : polygon) {
+        if (point_in_bounds(bounds, point)) {
+            return true;
+        }
+    }
+    for (std::size_t i = 0; i < polygon.size(); ++i) {
+        const Vec2f & a = polygon[i];
+        const Vec2f & b = polygon[(i + 1) % polygon.size()];
+        for (std::size_t edge = 0; edge < 4; ++edge) {
+            if (segments_intersect(a, b, corners[edge], corners[(edge + 1) % 4])) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 bool collision_flags_for_layer(const std::string & name, CollisionShape & shape) {
     if (name == "collision_full") {
         shape.blocks_players = shape.blocks_shots = shape.blocks_vision = true;
@@ -236,7 +266,8 @@ bool CollisionWorld::blocks_point(CollisionChannel channel, const Vec2f & point)
 std::vector<const CollisionShape *> CollisionWorld::query_bounds(CollisionChannel channel, const CollisionBounds & bounds) const {
     std::vector<const CollisionShape *> candidates;
     for (const CollisionShape & shape : shapes_) {
-        if (shape.blocks(channel) && shape.bounds.intersects(bounds)) {
+        if (shape.blocks(channel) && shape.bounds.intersects(bounds) &&
+            polygon_intersects_bounds(shape.points, bounds)) {
             candidates.push_back(&shape);
         }
     }
