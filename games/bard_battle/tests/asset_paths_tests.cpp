@@ -11,4 +11,7 @@ int main() {
     assert(map.find_object_layer("collision_full"));
     assert(map.find_object_layer("collision_shots"));
     assert(map.find_object_layer("collision_player"));
+    for (int i=1;i<=4;++i) {
+        assert(map.find_object_layer("respawn_zone_"+std::to_string(i)));
+    }
 }

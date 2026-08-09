@@ -52,6 +52,14 @@ Create Object Layers with these exact, case-sensitive names. Add rectangle objec
 
 Point objects, tile objects, zero-sized rectangles, and malformed polygons do not collide. Legacy `collision` or `boundary` layers and `engine.*` properties are ignored. Press **F3** in the client to show every active collision channel, including shapes on hidden layers.
 
+## Respawn zones
+
+Every Bard Battle map must contain exactly one Object Layer named `respawn_zone_1` through `respawn_zone_4`. All four exact, case-sensitive layers are mandatory even when the current match uses fewer teams.
+
+Each layer must contain at least one usable positive-area shape. Supported shapes are non-rotated rectangles and polygons with at least three valid points. Point and tile objects, rotated or zero-sized rectangles, and malformed polygons are ignored; object names, types, custom properties, and layer visibility do not affect spawning. Startup fails if a layer is missing, duplicated, has no supported shape, or has no location where the complete player bounds fit without touching player-channel collision.
+
+FFA spawning combines all four `respawn_zone_N` layers. Team spawning uses only `respawn_zone_N` for team N, so a two-team match uses zones 1 and 2. Multiple shapes in a selected layer form one area and are chosen proportionally by area. Spawn layers may be hidden in Tiled and remain active in gameplay.
+
 ## Unsupported features
 
 - Infinite/chunked maps

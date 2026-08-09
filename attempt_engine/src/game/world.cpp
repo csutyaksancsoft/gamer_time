@@ -1,12 +1,17 @@
 #include "game/world.h"
 
 #include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <limits>
+#include <stdexcept>
 
 namespace {
 
 constexpr UnitId kInvalidUnitId = static_cast<UnitId>(-1);
 constexpr std::uint32_t kFogWidth = 64;
 constexpr std::uint32_t kFogHeight = 64;
+constexpr std::uint64_t kFogCellSize = 16;
 
 } // namespace
 
@@ -17,6 +22,28 @@ World::World()
 void World::set_map(MapWorld map) {
     map_ = std::move(map);
     collision_ = CollisionWorld::from_map(map_);
+
+    const auto cells_for_extent = [](std::uint32_t tiles, float tile_size) {
+        const double pixels = static_cast<double>(tiles) * static_cast<double>(tile_size);
+        if (pixels <= 0.0) {
+            return std::uint32_t{0};
+        }
+        const double cells = std::ceil(pixels / static_cast<double>(kFogCellSize));
+        if (cells > static_cast<double>(std::numeric_limits<std::uint32_t>::max())) {
+            throw std::overflow_error("Map is too large for the fog mask");
+        }
+        return static_cast<std::uint32_t>(cells);
+    };
+
+    const Vec2f tile_size = map_.tile_size();
+    fog_width_ = cells_for_extent(map_.width(), tile_size.x);
+    fog_height_ = cells_for_extent(map_.height(), tile_size.y);
+    const std::uint64_t fog_cell_count =
+        static_cast<std::uint64_t>(fog_width_) * static_cast<std::uint64_t>(fog_height_);
+    if (fog_cell_count > static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max())) {
+        throw std::overflow_error("Fog mask is too large");
+    }
+    fog_mask_.assign(static_cast<std::size_t>(fog_cell_count), 0);
 }
 
 void World::seed_test_units() {
@@ -54,6 +81,7 @@ void World::replace_replicated_units(const std::vector<ReplicatedUnitState> & ne
         renders_[state.id].sprite_index=state.sprite_index;
         renders_[state.id].footprint=state.size;
         renders_[state.id].rotation_radians=state.rotation_radians;
+        renders_[state.id].transform_flags=state.transform_flags;
         renders_[state.id].solid_color=state.solid_color;
         renders_[state.id].circle_outline=state.circle_outline;
         std::copy(std::begin(state.color),std::end(state.color),std::begin(renders_[state.id].color));

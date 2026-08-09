@@ -10,7 +10,7 @@
 
 namespace net {
 
-constexpr std::uint32_t kProtocolVersion = 9;
+constexpr std::uint32_t kProtocolVersion = 11;
 constexpr std::size_t kMaxSongCandidates = 8;
 constexpr std::size_t kMaxRhythmNotes = 4096;
 constexpr std::size_t kMaxProjectiles = 1024;
@@ -49,7 +49,7 @@ constexpr TeamId kMaxTeam = 4;
 enum class RhythmGrade : std::uint8_t { perfect, good, miss };
 enum class RhythmAction : std::uint8_t { shoot, shield, melee };
 enum class ShieldMeleeMode : std::uint8_t { stun, kill };
-enum class SoundCue : std::uint8_t { death, shot_success, shot_failure, shot_hit_player, shot_hit_shield, shield_success, shield_failure };
+enum class SoundCue : std::uint8_t { death, shot_success, shot_failure, shot_hit_player, shot_hit_shield, shield_success, shield_failure, respawn, swing_attack, shield_break };
 
 struct PlayerState {
     PlayerId id = 0;
@@ -63,6 +63,7 @@ struct PlayerState {
     std::uint64_t respawn_at_us = 0;
     std::uint64_t protected_until_us = 0;
     std::uint64_t shield_until_us = 0;
+    std::uint64_t shield_started_us = 0;
     std::uint64_t stunned_until_us = 0;
     TeamId team = kNoTeam;
     VoteChoice vote = VoteChoice::none;
@@ -79,6 +80,7 @@ struct ProjectileState {
     Vec2f position{};
     Vec2f velocity{};
     float angle = 0.0f;
+    std::uint64_t spawned_at_us = 0;
 };
 
 struct MeleeEffectState {
@@ -87,6 +89,8 @@ struct MeleeEffectState {
     Vec2f position{};
     float radius = 0.0f;
     std::uint64_t expires_at_us = 0;
+    std::uint64_t started_at_us = 0;
+    float angle = 0.0f;
 };
 
 struct Snapshot {

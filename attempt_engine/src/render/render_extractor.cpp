@@ -83,6 +83,7 @@ RenderWorld RenderExtractor::build(
         render_unit.sprite_index = render->sprite_index;
         render_unit.selected = unit->selected;
         render_unit.rotation_radians=render->rotation_radians;
+        render_unit.transform_flags=render->transform_flags;
         render_unit.solid_color=render->solid_color;
         render_unit.circle_outline=render->circle_outline;
         for(int i=0;i<4;++i)render_unit.color[i]=render->color[i];

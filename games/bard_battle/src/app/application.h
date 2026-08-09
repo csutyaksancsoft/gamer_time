@@ -20,11 +20,13 @@
 #include "render/render_extractor.h"
 #include "render/render_world.h"
 #include "render/scene_renderer.h"
+#include "render/entity_animations.h"
 #include "ui/ui_model.h"
 
 #include <chrono>
 #include <string>
 #include <optional>
+#include <unordered_map>
 
 class Application {
 public:
@@ -69,6 +71,8 @@ private:
     AtlasAsset scene_atlas_;
     LoadedImage scene_atlas_image_;
     std::uint32_t player_sprite_base_ = 0;
+    entity_animation::Catalog entity_animations_;
+    std::unordered_map<net::PlayerId,bool> player_faces_left_;
     std::chrono::steady_clock::time_point last_tick_{};
     Vec2f predicted_position_{};
     bool have_predicted_position_ = false;

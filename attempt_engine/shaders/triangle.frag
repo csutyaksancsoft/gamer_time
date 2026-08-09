@@ -71,12 +71,9 @@ void main() {
     }
 
     if (scene.fogEnabled != 0u && (vFlags & 4u) == 0u) {
-        vec2 fogUv = clamp(
-            (vWorldPos + scene.fogSize * 0.5) / max(scene.fogSize, vec2(1.0)),
-            vec2(0.0),
-            vec2(1.0)
-        );
-        float fogValue = texture(uFogMask, fogUv).r;
+        vec2 fogUv = (vWorldPos + scene.fogSize * 0.5) / max(scene.fogSize, vec2(1.0));
+        bool insideFogMask = all(greaterThanEqual(fogUv, vec2(0.0))) && all(lessThanEqual(fogUv, vec2(1.0)));
+        float fogValue = insideFogMask ? texture(uFogMask, fogUv).r : 0.0;
         if ((vFlags & 8u) != 0u) {
             // Keep the map readable under fog while clearly darkening unseen areas.
             color *= mix(0.22, 1.0, fogValue);

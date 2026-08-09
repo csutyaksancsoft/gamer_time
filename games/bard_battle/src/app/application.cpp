@@ -7,6 +7,7 @@
 #include <cmath>
 #include <filesystem>
 #include <sstream>
+#include <iostream>
 #include <utility>
 
 namespace {
@@ -57,6 +58,8 @@ void Application::initialize() {
     const LoadedImage placeholder_atlas = assets::load_png_rgba(config_.asset_dir + "/tiled_projects/tiles/shared/sample_scene_atlas.png");
     assets::append_packed_sprites(scene_atlas_image_, placeholder_atlas, 4, scene_atlas_.tile_width, scene_atlas_.columns, player_sprite_base_);
     scene_atlas_.logical_tile_count += 4;
+    entity_animations_ = entity_animation::Catalog::load(config_.asset_dir + "/tiled_projects/entities");
+    for(const auto & warning:entity_animations_.pack(scene_atlas_,scene_atlas_image_))std::cerr<<"Entity assets: "<<warning<<'\n';
     scene_atlas_.columns = scene_atlas_image_.width / scene_atlas_.tile_width;
     scene_atlas_.rows = scene_atlas_image_.height / scene_atlas_.tile_height;
     scene_renderer_.initialize_scene_atlas(scene_atlas_, scene_atlas_image_);
@@ -155,8 +158,13 @@ void Application::tick_frame(float dt_seconds) {
             ReplicatedUnitState unit{};
             unit.id = player.id;
             unit.position = position;
-            unit.sprite_index = player_sprite_base_ + ((player.id - 1u) % 4u);
-            unit.rotation_radians = player.facing_angle;
+            const std::uint8_t variant=entity_animation::player_variant(player.team,player.color,snapshot.mode==net::GameMode::teams);
+            unit.sprite_index = player_sprite_base_ + variant-1u;
+            const auto role=static_cast<entity_animation::Role>(variant-1u);
+            if(const auto*strip=entity_animations_.find(role)){const bool moving=length_squared(player.velocity)>0.0001f;const auto frame=moving?entity_animation::frame_index(*strip,snapshot.server_time_us,true):0u;unit.sprite_index=strip->frames[frame].atlas_index;unit.size=strip->world_size;}
+            if(player.velocity.x<0.0f)player_faces_left_[player.id]=true;else if(player.velocity.x>0.0f)player_faces_left_[player.id]=false;
+            if(player_faces_left_[player.id])unit.transform_flags=assets::kTmxFlipHorizontal;
+            unit.rotation_radians = 0.0f;
             if (player.protected_until_us > snapshot.server_time_us &&
                 ((snapshot.server_time_us / 100000) % 2) == 0) {
                 unit.solid_color = true;
@@ -165,10 +173,10 @@ void Application::tick_frame(float dt_seconds) {
                 unit.color[2] = 1.0f;
             }
             units.push_back(unit);
-            if(player.shield_until_us>snapshot.server_time_us){ReplicatedUnitState shield{};shield.id=++render_id;shield.position=position;shield.size={40.0f,40.0f};shield.solid_color=true;shield.circle_outline=true;shield.color[0]=0.1f;shield.color[1]=0.55f;shield.color[2]=1.0f;shield.color[3]=0.42f;units.push_back(shield);}
+            if(player.shield_until_us>snapshot.server_time_us){ReplicatedUnitState shield{};shield.id=++render_id;shield.position=position;shield.size={40.0f,40.0f};if(const auto*strip=entity_animations_.find(entity_animation::Role::shield)){const auto elapsed=snapshot.server_time_us>=player.shield_started_us?snapshot.server_time_us-player.shield_started_us:0;shield.sprite_index=strip->frames[entity_animation::frame_index(*strip,elapsed,true)].atlas_index;shield.size=strip->world_size;}else{shield.solid_color=true;shield.circle_outline=true;shield.color[0]=0.1f;shield.color[1]=0.55f;shield.color[2]=1.0f;shield.color[3]=0.42f;}units.push_back(shield);}
         }
-        for(const net::ProjectileState & p:snapshot.projectiles){ReplicatedUnitState unit{};unit.id=++render_id;unit.position=p.position;unit.sprite_index=1000001u;unit.size={18.0f,6.0f};unit.rotation_radians=p.angle;unit.solid_color=true;unit.color[0]=1.0f;unit.color[1]=0.85f;unit.color[2]=0.15f;units.push_back(unit);}
-        for(const net::MeleeEffectState & melee:snapshot.melee_effects){if(melee.expires_at_us<=snapshot.server_time_us)continue;ReplicatedUnitState unit{};unit.id=++render_id;unit.position=melee.position;unit.size={melee.radius*2.0f,melee.radius*2.0f};unit.solid_color=true;unit.circle_outline=true;unit.color[0]=1.0f;unit.color[1]=0.35f;unit.color[2]=0.1f;unit.color[3]=0.82f;units.push_back(unit);}
+        for(const net::ProjectileState & p:snapshot.projectiles){ReplicatedUnitState unit{};unit.id=++render_id;unit.position=p.position;unit.sprite_index=1000001u;unit.size={18.0f,6.0f};unit.rotation_radians=p.angle;if(const auto*strip=entity_animations_.find(entity_animation::Role::projectile)){const auto elapsed=snapshot.server_time_us>=p.spawned_at_us?snapshot.server_time_us-p.spawned_at_us:0;unit.sprite_index=strip->frames[entity_animation::frame_index(*strip,elapsed,true)].atlas_index;unit.size=strip->world_size;}else{unit.solid_color=true;unit.color[0]=1.0f;unit.color[1]=0.85f;unit.color[2]=0.15f;}units.push_back(unit);}
+        for(const net::MeleeEffectState & melee:snapshot.melee_effects){if(melee.expires_at_us<=snapshot.server_time_us)continue;ReplicatedUnitState unit{};unit.id=++render_id;unit.position=melee.position;unit.size={melee.radius*2.0f,melee.radius*2.0f};unit.rotation_radians=melee.angle;if(const auto*strip=entity_animations_.find(entity_animation::Role::melee)){const auto elapsed=snapshot.server_time_us>=melee.started_at_us?snapshot.server_time_us-melee.started_at_us:0;unit.sprite_index=strip->frames[entity_animation::frame_index(*strip,elapsed,false)].atlas_index;unit.size=strip->world_size;}else{unit.solid_color=true;unit.circle_outline=true;unit.color[0]=1.0f;unit.color[1]=0.35f;unit.color[2]=0.1f;unit.color[3]=0.82f;}units.push_back(unit);}
         world_.replace_replicated_units(units);
         world_.set_local_unit(network_.player_id());
     }

@@ -107,6 +107,7 @@ struct ReplicatedUnitState {
     std::uint32_t sprite_index = 49;
     Vec2f size{16.0f,16.0f};
     float rotation_radians = 0.0f;
+    std::uint32_t transform_flags = 0;
     bool solid_color = false;
     bool circle_outline = false;
     float opacity = 1.0f;

@@ -9,7 +9,7 @@
 
 namespace {
 constexpr std::size_t kMaxVoices=32;
-constexpr std::array<const char *,7> kFolders={"death","shot_success","shot_failure","shot_hit_player","shot_hit_shield","shield_success","shield_failure"};
+constexpr std::array<const char *,10> kFolders={"death","shot_success","shot_failure","shot_hit_player","shot_hit_shield","shield_success","shield_failure","respawn","swing_attack","shield_break"};
 bool wav_extension(const std::filesystem::path & path){std::string extension=path.extension().string();std::transform(extension.begin(),extension.end(),extension.begin(),[](unsigned char c){return static_cast<char>(std::tolower(c));});return extension==".wav";}
 }
 

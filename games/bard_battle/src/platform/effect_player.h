@@ -26,7 +26,7 @@ private:
     std::size_t choose(Pool & pool);
     SDL_AudioDeviceID device_ = 0;
     SDL_AudioSpec output_spec_{SDL_AUDIO_F32,2,48000};
-    std::array<Pool,7> pools_{};
+    std::array<Pool,10> pools_{};
     std::vector<Voice> voices_;
     std::mt19937 random_{std::random_device{}()};
     std::string diagnostic_;
