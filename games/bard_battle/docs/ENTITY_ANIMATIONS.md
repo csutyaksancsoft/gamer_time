@@ -51,6 +51,6 @@ Player melee is a special single-frame spin. Put one square image in `entities/p
 
 The supplied player 1 `block-Sheet.png` is configured as five 32×32 frames at 100 ms each and displays at 40×40 world units.
 
-Each state is independent. Idle and running no longer share a sheet. The supplied single-frame `player_1/idle/idle.png` is configured as player 1's idle pose and renders at 32×32 world units. Empty states fall back to that player's idle; if that is also empty, they fall back to player 1's idle. Death, attack, melee, and shield-break strips play once when their matching network event arrives. Running and shield loop while active.
+Each state is independent. Idle and running no longer share a sheet. Idle poses render at 40×40 world units to compensate for the extra transparent padding in their 32×32 source canvases. Empty states fall back to that player's idle; if that is also empty, they fall back to player 1's idle. Death, attack, melee, and shield-break strips play once when their matching network event arrives. Running and shield loop while active.
 
 Malformed files, duplicate roles, and missing roles produce warnings. Players fall back to `player_1` where possible; projectile and melee objects retain their existing geometric placeholders.
