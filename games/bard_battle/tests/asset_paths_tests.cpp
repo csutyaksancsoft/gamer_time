@@ -1,9 +1,14 @@
+#ifdef BARD_BATTLE_TEST_ENTITY_PACKING
 #include "assets/image_loader.h"
+#endif
 #include "assets/tmx_map_loader.h"
 #include "game/map_world.h"
 #include "render/entity_animations.h"
 
 #include <array>
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <cassert>
 #include <string>
 
@@ -45,6 +50,7 @@ int main() {
     const auto * running=animations.find_player_exact(1,entity_animation::PlayerAnimation::running);
     assert(running->frames.size()==3&&running->source_width==23&&running->source_height==28);
 
+#ifdef BARD_BATTLE_TEST_ENTITY_PACKING
     auto runtime_atlas = assets::build_runtime_atlas(map_asset);
     assert(animations.pack(runtime_atlas.atlas, runtime_atlas.image).empty());
     melee = animations.find_player_exact(1, entity_animation::PlayerAnimation::melee);
@@ -58,4 +64,5 @@ int main() {
         const auto destination_offset=(static_cast<std::size_t>(destination_y+y)*runtime_atlas.image.width+destination_x+x)*4+channel;
         assert(source.rgba_pixels[source_offset] == runtime_atlas.image.rgba_pixels[destination_offset]);
     }
+#endif
 }

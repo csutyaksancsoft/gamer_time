@@ -22,9 +22,9 @@ add_library(bard_battle_match STATIC src/game/match_rules.cpp src/ui/ui_model.cp
 bard_battle_target(bard_battle_match)
 target_link_libraries(bard_battle_match PUBLIC bard_battle_net attempt_engine_core)
 
-add_library(bard_battle_entity_animations STATIC src/render/entity_animations.cpp src/render/entity_animation_packing.cpp)
+add_library(bard_battle_entity_animations STATIC src/render/entity_animations.cpp)
 bard_battle_target(bard_battle_entity_animations)
-target_link_libraries(bard_battle_entity_animations PUBLIC attempt_engine_assets attempt_engine_core)
+target_link_libraries(bard_battle_entity_animations PUBLIC attempt_engine_core)
 
 add_library(bard_battle_spawn STATIC src/server/spawn_zones.cpp)
 bard_battle_target(bard_battle_spawn)
@@ -83,6 +83,15 @@ if(BARD_BATTLE_BUILD_SERVER)
 endif()
 
 if(BARD_BATTLE_BUILD_CLIENT)
+    add_library(bard_battle_entity_animation_packing STATIC src/render/entity_animation_packing.cpp)
+    bard_battle_target(bard_battle_entity_animation_packing)
+    target_link_libraries(bard_battle_entity_animation_packing PUBLIC bard_battle_entity_animations attempt_engine_assets)
+
+    if(BUILD_TESTING)
+        target_compile_definitions(bard_battle_asset_paths_tests PRIVATE BARD_BATTLE_TEST_ENTITY_PACKING=1)
+        target_link_libraries(bard_battle_asset_paths_tests PRIVATE bard_battle_entity_animation_packing)
+    endif()
+
     add_library(bard_battle_audio STATIC
         src/platform/audio_playback_device.cpp
         src/platform/effect_player.cpp
@@ -114,7 +123,7 @@ if(BARD_BATTLE_BUILD_CLIENT)
 
     add_library(bard_battle_app STATIC src/app/application.cpp)
     bard_battle_target(bard_battle_app)
-    target_link_libraries(bard_battle_app PUBLIC attempt_engine_assets attempt_engine_world attempt_engine_render bard_battle_audio bard_battle_scene bard_battle_net bard_battle_rhythm bard_battle_match bard_battle_entity_animations)
+    target_link_libraries(bard_battle_app PUBLIC attempt_engine_assets attempt_engine_world attempt_engine_render bard_battle_audio bard_battle_scene bard_battle_net bard_battle_rhythm bard_battle_match bard_battle_entity_animations bard_battle_entity_animation_packing)
 
     if(WIN32)
         add_executable(bard_battle WIN32 src/main.cpp)
