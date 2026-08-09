@@ -3,8 +3,8 @@
  <properties>
   <property name="bard.animation" value="attack"/>
   <property name="bard.player" type="int" value="3"/>
-  <property name="bard.world_height" type="float" value="32"/>
-  <property name="bard.world_width" type="float" value="32"/>
+  <property name="bard.world_height" type="float" value="40"/>
+  <property name="bard.world_width" type="float" value="40"/>
  </properties>
  <image source="attack.png" width="128" height="32"/>
  <tile id="0">
@@ -16,4 +16,3 @@
   </animation>
  </tile>
 </tileset>
-

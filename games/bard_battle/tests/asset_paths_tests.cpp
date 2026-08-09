@@ -33,8 +33,10 @@ int main() {
     assert(animations.warnings().empty());
     const auto * idle = animations.find_player(1, entity_animation::PlayerAnimation::idle);
     assert(idle->tsx_path.filename() == "idle.tsx");
-    assert(idle->world_size.x == 32.0f && idle->world_size.y == 32.0f);
-    assert(animations.find_player(1, entity_animation::PlayerAnimation::attack)->tsx_path.filename() == "attack.tsx");
+    assert(idle->world_size.x == 40.0f && idle->world_size.y == 40.0f);
+    const auto * attack=animations.find_player(1,entity_animation::PlayerAnimation::attack);
+    assert(attack->tsx_path.filename() == "attack.tsx");
+    assert(attack->world_size.x == 40.0f && attack->world_size.y == 40.0f);
     assert(animations.find_player(1, entity_animation::PlayerAnimation::death)->tsx_path.filename() == "death.tsx");
     assert(animations.find_player(1, entity_animation::PlayerAnimation::shield)->tsx_path.filename() == "shield.tsx");
     assert(animations.find_player(1, entity_animation::PlayerAnimation::shield_break)->tsx_path.filename() == "shield_break.tsx");
