@@ -76,7 +76,7 @@ void main() {
         float fogValue = insideFogMask ? texture(uFogMask, fogUv).r : 0.0;
         if ((vFlags & 8u) != 0u) {
             // Keep the map readable under fog while clearly darkening unseen areas.
-            color *= mix(0.22, 1.0, fogValue);
+            color *= mix(0.55, 1.0, fogValue);
         } else {
             // Dynamic world objects must not leak information through fog.
             alpha *= fogValue;

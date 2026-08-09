@@ -2,6 +2,7 @@
 
 #include "core/types.h"
 #include "game/components.h"
+#include "game/map_world.h"
 #include "platform/camera_controller.h"
 
 #include <cstdint>
@@ -49,6 +50,7 @@ struct RenderTileLayer {
     bool visible = true;
     bool renderable = true;
     float opacity = 1.0f;
+    TileRenderPhase render_phase = TileRenderPhase::BelowUnits;
     std::vector<RenderTile> tiles;
 };
 
@@ -56,6 +58,7 @@ struct RenderTileLayerRange {
     std::uint32_t instance_offset = 0;
     std::uint32_t instance_count = 0;
     float opacity = 1.0f;
+    TileRenderPhase render_phase = TileRenderPhase::BelowUnits;
 };
 
 struct ProjectedUnit {

@@ -1,4 +1,5 @@
 #include "game/world.h"
+#include "game/fog_config.h"
 
 #include <algorithm>
 #include <cmath>
@@ -11,7 +12,6 @@ namespace {
 constexpr UnitId kInvalidUnitId = static_cast<UnitId>(-1);
 constexpr std::uint32_t kFogWidth = 64;
 constexpr std::uint32_t kFogHeight = 64;
-constexpr std::uint64_t kFogCellSize = 16;
 
 } // namespace
 
@@ -28,7 +28,7 @@ void World::set_map(MapWorld map) {
         if (pixels <= 0.0) {
             return std::uint32_t{0};
         }
-        const double cells = std::ceil(pixels / static_cast<double>(kFogCellSize));
+        const double cells = std::ceil(pixels / static_cast<double>(fog::kCellWorldSize));
         if (cells > static_cast<double>(std::numeric_limits<std::uint32_t>::max())) {
             throw std::overflow_error("Map is too large for the fog mask");
         }

@@ -33,6 +33,11 @@ enum class MapObjectShape {
     Polygon,
 };
 
+enum class TileRenderPhase {
+    BelowUnits,
+    AboveUnits,
+};
+
 struct MapObject {
     std::uint32_t id = 0;
     std::string name;
@@ -67,6 +72,7 @@ struct TileLayer {
     bool visible = true;
     bool renderable = true;
     float opacity = 1.0f;
+    TileRenderPhase render_phase = TileRenderPhase::BelowUnits;
     std::uint32_t width = 0;
     std::uint32_t height = 0;
     std::vector<std::uint32_t> atlas_indices;

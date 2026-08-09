@@ -40,6 +40,8 @@ For freely placed props, create a non-collision Object Layer and set its draw or
 
 Keep visual Object Layers visible and give them useful names such as `props` or `canopy`. Layer and object opacity/visibility affect rendering only; invisible collision layers remain active in gameplay.
 
+Tile layers render below players by default. To make a tile layer act as foreground, add a custom string property named `render_phase` with the value `above_units`. Foreground behavior is property-driven, so the layer can be named freely. The values `below_units` and an omitted or unrecognized value render below players.
+
 ## Collision
 
 Collision is authored with shapes on specially named Object Layers. In Tiled:

@@ -1,5 +1,6 @@
 #include "render/scene_renderer.h"
 #include "render/render_safety.h"
+#include "game/fog_config.h"
 
 #include <array>
 #include <algorithm>
@@ -7,9 +8,6 @@
 #include <iostream>
 
 namespace {
-
-constexpr float kFogCellWorldWidth = 16.0f;
-constexpr float kFogCellWorldHeight = 16.0f;
 
 struct ScenePushConstants {
     float camera_center[2];
@@ -677,8 +675,8 @@ void SceneRenderer::record_command_buffer(VkCommandBuffer command_buffer, uint32
     push_constants.atlas_texture_size[1] = static_cast<float>(atlas.height);
     push_constants.atlas_tile_size[0] = static_cast<float>(scene_atlas_.tile_width);
     push_constants.atlas_tile_size[1] = static_cast<float>(scene_atlas_.tile_height);
-    push_constants.fog_size[0] = static_cast<float>(fog.width) * kFogCellWorldWidth;
-    push_constants.fog_size[1] = static_cast<float>(fog.height) * kFogCellWorldHeight;
+    push_constants.fog_size[0] = static_cast<float>(fog.width) * ::fog::kCellWorldSize;
+    push_constants.fog_size[1] = static_cast<float>(fog.height) * ::fog::kCellWorldSize;
     push_constants.zoom = camera_.zoom;
     push_constants.solid_terrain_debug = solid_terrain_debug_ ? 1u : 0u;
     push_constants.fog_enabled = fog_enabled_ ? 1u : 0u;
@@ -691,19 +689,21 @@ void SceneRenderer::record_command_buffer(VkCommandBuffer command_buffer, uint32
         &push_constants
     );
 
-    for (const RenderTileLayerRange & range : batch_.terrain_layer_ranges) {
-        if (range.instance_count == 0) {
-            continue;
+    const auto draw_terrain_phase = [&](TileRenderPhase phase) {
+        for (const RenderTileLayerRange & range : batch_.terrain_layer_ranges) {
+            if (range.render_phase != phase || range.instance_count == 0) continue;
+            if (!render_safety::valid_draw_range(range.instance_offset, range.instance_count, batch_.instances.size())) {
+                std::cerr << "Skipping invalid terrain draw range offset=" << range.instance_offset << " count=" << range.instance_count << " total=" << batch_.instances.size() << '\n';
+                continue;
+            }
+            vkCmdDrawIndexed(command_buffer, 6, range.instance_count, 0, 0, static_cast<int32_t>(range.instance_offset));
         }
-        if (!render_safety::valid_draw_range(range.instance_offset, range.instance_count, batch_.instances.size())) {
-            std::cerr << "Skipping invalid terrain draw range offset=" << range.instance_offset << " count=" << range.instance_count << " total=" << batch_.instances.size() << '\n';
-            continue;
-        }
-        vkCmdDrawIndexed(command_buffer, 6, range.instance_count, 0, 0, static_cast<int32_t>(range.instance_offset));
-    }
+    };
+    draw_terrain_phase(TileRenderPhase::BelowUnits);
     if (batch_.unit_instance_count > 0 && render_safety::valid_draw_range(batch_.unit_instance_offset, batch_.unit_instance_count, batch_.instances.size())) {
         vkCmdDrawIndexed(command_buffer, 6, batch_.unit_instance_count, 0, 0, static_cast<int32_t>(batch_.unit_instance_offset));
     }
+    draw_terrain_phase(TileRenderPhase::AboveUnits);
     if (batch_.debug_instance_count > 0 && render_safety::valid_draw_range(batch_.debug_instance_offset, batch_.debug_instance_count, batch_.instances.size())) {
         vkCmdDrawIndexed(command_buffer, 6, batch_.debug_instance_count, 0, 0, static_cast<int32_t>(batch_.debug_instance_offset));
     }

@@ -11,6 +11,9 @@ int main() {
     assert(map.find_object_layer("collision_full"));
     assert(map.find_object_layer("collision_shots"));
     assert(map.find_object_layer("collision_player"));
+    assert(map.find_tile_layer("Elevation")->render_phase == TileRenderPhase::AboveUnits);
+    assert(map.find_tile_layer("Ramps")->render_phase == TileRenderPhase::AboveUnits);
+    assert(map.find_tile_layer("base")->render_phase == TileRenderPhase::BelowUnits);
     for (int i=1;i<=4;++i) {
         assert(map.find_object_layer("respawn_zone_"+std::to_string(i)));
     }

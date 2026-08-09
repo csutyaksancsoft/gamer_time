@@ -24,6 +24,7 @@ RenderWorld RenderExtractor::build(
         render_layer.visible = layer.visible;
         render_layer.renderable = layer.renderable;
         render_layer.opacity = layer.opacity;
+        render_layer.render_phase = layer.render_phase;
         render_layer.tiles.reserve(layer.tile_count());
 
         for (std::uint32_t y = 0; y < layer.height; ++y) {

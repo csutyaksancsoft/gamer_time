@@ -18,7 +18,7 @@ constexpr std::size_t kMaxMeleeEffects = 256;
 constexpr std::uint16_t kServerPort = 27020;
 constexpr std::size_t kMaxPlayers = 64;
 constexpr float kMoveSpeed = 160.0f;
-constexpr float kVisionRadius = 224.0f;
+constexpr float kVisionRadius = 512.0f;
 
 using PlayerId = std::uint32_t;
 

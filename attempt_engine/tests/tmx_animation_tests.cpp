@@ -26,7 +26,9 @@ int main() {
         std::ofstream tmx(root / "map.tmx");
         tmx << R"(<map orientation="orthogonal" renderorder="right-down" width="2" height="1" tilewidth="16" tileheight="16">
  <tileset firstgid="1" source="tiles/animated.tsx"/><tileset firstgid="10" source="tiles/second.tsx"/>
- <layer id="1" name="ground" width="2" height="1"><data encoding="csv">2,)" << transformed << R"(</data></layer>
+ <layer id="1" name="ground" width="2" height="1"><properties><property name="render_phase" value="above_units"/></properties><data encoding="csv">2,)" << transformed << R"(</data></layer>
+ <layer id="4" name="ordinary" width="2" height="1"><data encoding="csv">0,0</data></layer>
+ <layer id="5" name="unknown-phase" width="2" height="1"><properties><property name="render_phase" value="sky"/></properties><data encoding="csv">0,0</data></layer>
  <objectgroup id="2" name="props" draworder="topdown" opacity="0.5"><object id="7" x="8" y="16" width="32" height="24" rotation="30" gid="2"/></objectgroup>
  <objectgroup id="3" name="collision_full"><object id="8" x="0" y="0"><polygon points="0,0 16,0 16,16"/></object></objectgroup>
 </map>)";
@@ -44,6 +46,9 @@ int main() {
     assert(ground.atlas_indices[0] == 1);
     assert(ground.atlas_indices[1] == 3);
     assert(ground.transform_flags[1] == (assets::kTmxFlipHorizontal | assets::kTmxFlipDiagonal));
+    assert(ground.render_phase == TileRenderPhase::AboveUnits);
+    assert(map.find_tile_layer("ordinary")->render_phase == TileRenderPhase::BelowUnits);
+    assert(map.find_tile_layer("unknown-phase")->render_phase == TileRenderPhase::BelowUnits);
     assert(map.resolve_animated_index(1, 0) == 0);
     assert(map.resolve_animated_index(1, 99) == 0);
     assert(map.resolve_animated_index(1, 100) == 2);

@@ -158,6 +158,7 @@ void Application::tick_frame(float dt_seconds) {
             ReplicatedUnitState unit{};
             unit.id = player.id;
             unit.position = position;
+            unit.vision_radius = net::kVisionRadius;
             const std::uint8_t variant=entity_animation::player_variant(player.team,player.color,snapshot.mode==net::GameMode::teams);
             unit.sprite_index = player_sprite_base_ + variant-1u;
             const auto role=static_cast<entity_animation::Role>(variant-1u);

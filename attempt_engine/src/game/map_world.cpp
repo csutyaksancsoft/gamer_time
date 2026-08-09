@@ -220,6 +220,10 @@ MapWorld MapWorld::from_tmx(const TmxMapAsset & map_asset) {
             layer.width = source.width;
             layer.height = source.height;
             layer.properties = to_map_properties(source.properties);
+            if (const MapProperty * property = find_property_by_name(layer.properties, "render_phase");
+                property && property->value == "above_units") {
+                layer.render_phase = TileRenderPhase::AboveUnits;
+            }
             layer.atlas_indices.reserve(source.gids.size());
 
             layer.transform_flags.reserve(source.gids.size());

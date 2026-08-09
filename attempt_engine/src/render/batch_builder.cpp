@@ -18,6 +18,7 @@ RenderBatch BatchBuilder::build(const RenderWorld & render_world) const {
         RenderTileLayerRange range{};
         range.instance_offset = static_cast<std::uint32_t>(batch.instances.size());
         range.opacity = layer.opacity;
+        range.render_phase = layer.render_phase;
 
         for (const RenderTile & tile : layer.tiles) {
             InstanceData instance{};

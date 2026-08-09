@@ -58,10 +58,10 @@ World revealed_from(Vec2f position, float radius = 72.0f) {
 int main() {
     World dimensions;
     dimensions.set_map(MapWorld::from_tmx(make_map()));
-    // 65*17 by 31*19 pixels, rounded up to complete 16-world-unit cells.
-    assert(dimensions.fog_width() == 70);
-    assert(dimensions.fog_height() == 37);
-    assert(dimensions.fog_mask().size() == 70u * 37u);
+    // 65*17 by 31*19 pixels, rounded up to complete 8-world-unit cells.
+    assert(dimensions.fog_width() == 139);
+    assert(dimensions.fog_height() == 74);
+    assert(dimensions.fog_mask().size() == 139u * 74u);
 
     const Vec2f origin = dimensions.map().origin();
     const float right = -origin.x;
@@ -90,7 +90,7 @@ int main() {
             }
             fullest_column = std::max(fullest_column, column_count);
         }
-        assert(visible_count > 0 && visible_count < 80);
+        assert(visible_count > 0 && visible_count < 320);
         assert(fullest_row < world.fog_width());
         assert(fullest_column < world.fog_height());
         assert(!visible(world, 0, 0));
@@ -98,14 +98,14 @@ int main() {
     }
 
     const World radius_check = revealed_from({0.0f, 0.0f}, 32.0f);
-    assert(visible(radius_check, 34, 18));
-    assert(!visible(radius_check, 40, 18));
+    assert(visible(radius_check, 69, 36));
+    assert(!visible(radius_check, 74, 36));
 
     World occlusion;
     occlusion.set_map(MapWorld::from_tmx(make_map(true)));
     const UnitId unit = occlusion.create_unit({{-40.0f, 0.0f}}, {}, {112.0f}, {});
     occlusion.set_local_unit(unit);
     FogOfWarSystem{}.update(occlusion);
-    assert(visible(occlusion, 33, 18)); // between the source and wall
-    assert(!visible(occlusion, 38, 18)); // in range, but behind the wall
+    assert(visible(occlusion, 67, 36)); // between the source and wall
+    assert(!visible(occlusion, 75, 36)); // in range, but behind the wall
 }

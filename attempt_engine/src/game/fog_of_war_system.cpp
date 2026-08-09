@@ -1,5 +1,6 @@
 #include "game/fog_of_war_system.h"
 
+#include "game/fog_config.h"
 #include "game/world.h"
 
 #include <algorithm>
@@ -8,8 +9,8 @@
 void FogOfWarSystem::update(World & world) const {
     std::fill(world.fog_mask().begin(), world.fog_mask().end(), static_cast<std::uint8_t>(0));
 
-    const float cell_width = 16.0f;
-    const float cell_height = 16.0f;
+    const float cell_width = fog::kCellWorldSize;
+    const float cell_height = fog::kCellWorldSize;
     const float half_width = static_cast<float>(world.fog_width()) * cell_width * 0.5f;
     const float half_height = static_cast<float>(world.fog_height()) * cell_height * 0.5f;
 
